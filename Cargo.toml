@@ -3,6 +3,20 @@ name = "violet"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+# Error handling.
+anyhow = "1.0"
+# Command line argument parsing.
+clap = { version = "3", features = ["derive"] }
+# Logging facade.
+log = "0.4"
+# Logging implementation.
+env_logger = "0.9"
+# Linear algebra library similar to Eigen for C++.
+nalgebra = "0.30"
+# Deserialization.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# TODO To be added.
+# serde_yaml = "0.8"
