@@ -29,9 +29,9 @@ impl Input {
     })
   }
 
-  // Not using `impl Iterator` to allow returning `Result`.
-  // TODO What if the Iterator Output type was Result and caller had to check it?
-  // End of data is signaled by `Result::Ok(Option::None)`.
+  // Not using the Iterator trait here because "streaming iterators" are not
+  // supported by the trait. Specifically, the yielded items are not allowed
+  // to borrow from the `Input` struct, but the InputData::Frame variant does that.
   pub fn next(&mut self) -> Result<Option<InputData>> {
     loop {
       self.line.clear();
