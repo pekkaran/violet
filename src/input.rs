@@ -3,27 +3,34 @@ use crate::all::*;
 pub struct Input {
   reader: BufReader<File>,
   line: String,
-  // TODO Read video data.
-  // Outer Vec for mono, stereo, etc., inner for frame data bytes size of `height*width`.
-  // video: Vec<Vec<u8>>,
+  video_input: VideoInput,
 }
 
-pub enum InputData {
+pub struct InputFrame<'a> {
+  pub video: &'a VideoFrame,
+  pub time: f64,
+}
+
+pub enum InputData<'a> {
   Gyroscope { time: f64, v: Vector3d },
   Accelerometer { time: f64, v: Vector3d },
-  // Frame
+  Frame(InputFrame<'a>),
 }
 
 impl Input {
   pub fn new(path: &Path) -> Result<Input> {
-    let file = File::open(path)?;
+    let file = File::open(path.join("data.jsonl"))?;
+    let video_input = VideoInput::new(&path.join("data.mp4"))
+      .context("Failed to create video input")?;
     Ok(Input {
       reader: BufReader::new(file),
       line: String::new(),
+      video_input,
     })
   }
 
   // Not using `impl Iterator` to allow returning `Result`.
+  // TODO What if the Iterator Output type was Result and caller had to check it?
   // End of data is signaled by `Result::Ok(Option::None)`.
   pub fn next(&mut self) -> Result<Option<InputData>> {
     loop {
@@ -42,7 +49,7 @@ impl Input {
 
       if let Some(sensor) = value.get("sensor") {
         let v = &sensor["values"].as_array()
-          .ok_or(anyhow!("Sensor values field is not an array"))?;
+          .ok_or(anyhow!("Sensor values field is not an array."))?;
         let v: Vec<f64> = v.iter().map(|x| x.as_f64().unwrap()).collect();
         assert!(v.len() >= 3);
         let v = Vector3d::new(v[0], v[1], v[2]);
@@ -59,7 +66,12 @@ impl Input {
         }
       }
       else if let Some(_frames) = value.get("frames") {
-        // dbg!(frames);
+        // let frames = frames.as_array().ok_or(anyhow!("Frames field is not an array."))?;
+        let input_frame = InputFrame {
+          video: self.video_input.read()?,
+          time,
+        };
+        return Ok(Some(InputData::Frame(input_frame)));
       }
       else if let Some(_) = value.get("groundTruth") {
         // Pass.

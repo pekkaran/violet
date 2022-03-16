@@ -1,6 +1,7 @@
 mod all;
 mod input;
 mod util;
+mod video;
 
 use all::*;
 
@@ -28,15 +29,23 @@ fn run() -> Result<()> {
 
   let args = Args::parse();
   let input_folder_path = Path::new(&args.input_folder);
-  let mut input = Input::new(&input_folder_path.join("data.jsonl"))?;
+  let mut input = Input::new(&input_folder_path)?;
 
   while let Some(data) = input.next()? {
     match data {
       #[allow(unused_variables)]
       InputData::Gyroscope { time, v } => {
+        // dbg!(v);
       },
       #[allow(unused_variables)]
       InputData::Accelerometer { time, v } => {
+        // dbg!(v);
+      },
+      #[allow(unused_variables)]
+      InputData::Frame(frame) => {
+        // dbg!(frame.video.width);
+        // dbg!(frame.video.height);
+        // dbg!(frame.time);
       },
     }
   }

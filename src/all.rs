@@ -3,12 +3,13 @@
 pub use crate::{
   input::*,
   util::*,
+  video::*,
 };
 
 pub use {
   std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
   },
   log::{debug, error, info, warn, LevelFilter},

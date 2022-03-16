@@ -1,4 +1,3 @@
-
 pub fn format_log(
   buf: &mut env_logger::fmt::Formatter,
   record: &log::Record,
