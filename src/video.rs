@@ -7,6 +7,12 @@ pub struct VideoInput {
   video_frame: VideoFrame,
 }
 
+pub struct VideoFrame {
+  pub data: Vec<u8>,
+  pub width: usize,
+  pub height: usize,
+}
+
 impl VideoInput {
   pub fn new(path: &Path) -> Result<VideoInput> {
     // TODO Try remove parameters.
@@ -41,10 +47,4 @@ impl VideoInput {
     self.video_frame.height = height;
     Ok(&self.video_frame)
   }
-}
-
-pub struct VideoFrame {
-  pub data: Vec<u8>,
-  pub width: usize,
-  pub height: usize,
 }

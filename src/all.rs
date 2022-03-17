@@ -1,6 +1,7 @@
 // NOTE This kind of import-all file isn't a common Rust idiom.
 
 pub use crate::{
+  event_loop::*,
   input::*,
   util::*,
   video::*,
