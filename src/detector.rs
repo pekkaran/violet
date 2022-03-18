@@ -9,6 +9,6 @@ impl Detector {
     }
   }
 
-  pub fn process(&mut self, frame: &InputFrame) {
+  pub fn process(&mut self, _frame: &InputFrame) {
   }
 }
