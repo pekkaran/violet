@@ -1,8 +1,10 @@
 mod all;
 mod input;
 mod event_loop;
+mod tracker;
 mod util;
 mod video;
+mod vio;
 
 use all::*;
 
@@ -59,6 +61,7 @@ fn run() -> Result<()> {
     input: &mut input,
     buffer: &mut buffer,
     graphics_context: &mut graphics_context,
+    vio: Vio::new(),
   };
 
   event_loop.run_return(move |event, _, mut control_flow| {

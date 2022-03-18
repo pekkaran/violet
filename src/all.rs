@@ -3,8 +3,10 @@
 pub use crate::{
   event_loop::*,
   input::*,
+  tracker::*,
   util::*,
   video::*,
+  vio::*,
 };
 
 pub use {
@@ -15,9 +17,8 @@ pub use {
   },
   log::{debug, error, info, warn, LevelFilter},
   nalgebra::DMatrix,
-  // NOTE Masks the language `Result` type.
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
 };
 
-// C++ Eigen-like aliases.
+// Eigen-like aliases.
 pub type Vector3d = nalgebra::Vector3::<f64>;

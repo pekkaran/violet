@@ -9,6 +9,7 @@ pub struct EventLoopArgs<'a> {
   pub input: &'a mut Input,
   pub buffer: &'a mut Vec<u32>,
   pub graphics_context: &'a mut GraphicsContext<Window>,
+  pub vio: Vio,
 }
 
 pub fn handle_event(
@@ -61,18 +62,11 @@ pub fn handle_event(
   }
 
   match args.input.next()? {
-    Some(data) => {
-      match data {
-        #[allow(unused_variables)]
-        InputData::Gyroscope { time, v } => {
-          // dbg!(v);
-        },
-        #[allow(unused_variables)]
-        InputData::Accelerometer { time, v } => {
-          // dbg!(v);
-        },
-        #[allow(unused_variables)]
-        InputData::Frame(frame) => {
+    Some(input_data) => {
+      match input_data {
+        InputData::Gyroscope { time: _, v: _ } => {},
+        InputData::Accelerometer { time: _, v: _ } => {}
+        InputData::Frame(ref frame) => {
           for i in 0..frame.video.height {
             if i >= window_height { continue }
             for j in 0..frame.video.width {
@@ -84,6 +78,7 @@ pub fn handle_event(
           args.graphics_context.window().request_redraw();
         },
       }
+      args.vio.process(&input_data);
     },
     None => *control_flow = ControlFlow::Exit,
   }
