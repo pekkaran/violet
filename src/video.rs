@@ -15,10 +15,8 @@ pub struct VideoFrame {
 
 impl VideoInput {
   pub fn new(path: &Path) -> Result<VideoInput> {
-    // TODO Try remove parameters.
-    // let cmd_str = "ffmpeg -i {} -f rawvideo -vcodec rawvideo -vsync vfr -pix_fmt gray - 2>/dev/null";
     let path = path.to_str().ok_or(anyhow!("Failed to parse video path."))?;
-    let cmd_str = format!("ffmpeg -i {} -f rawvideo -vcodec rawvideo -vsync vfr -pix_fmt gray -", path);
+    let cmd_str = format!("ffmpeg -i {} -f rawvideo -pix_fmt gray - 2>/dev/null", path);
     // `bash -c` splits the command into tokens.
     let child = Command::new("bash").args(["-c", &cmd_str])
       .stdout(Stdio::piped())
