@@ -11,6 +11,7 @@ use clap::Parser;
 use softbuffer::GraphicsContext;
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
+use winit::platform::run_return::EventLoopExtRunReturn;
 
 #[derive(Parser)]
 struct Args {
@@ -43,7 +44,7 @@ fn run() -> Result<()> {
   let width = 1920;
   let height = 1080;
   let size = winit::dpi::PhysicalSize::new(width, height);
-  let event_loop = EventLoop::new();
+  let mut event_loop = EventLoop::new();
   let window = WindowBuilder::new()
     .with_resizable(false)
     .with_decorations(false)
@@ -54,16 +55,17 @@ fn run() -> Result<()> {
   let mut graphics_context = unsafe { GraphicsContext::new(window) }.unwrap();
 
   let mut buffer = vec![];
-  event_loop.run(move |event, _, mut control_flow| {
-    if let Err(err) = handle_event(
-      event,
-      &mut input,
-      &mut buffer,
-      &mut graphics_context,
-      &mut control_flow,
-    ) {
+  let mut args = EventLoopArgs {
+    input: &mut input,
+    buffer: &mut buffer,
+    graphics_context: &mut graphics_context,
+  };
+
+  event_loop.run_return(move |event, _, mut control_flow| {
+    if let Err(err) = handle_event(event, &mut control_flow, &mut args) {
       handle_error(&err);
       *control_flow = ControlFlow::Exit;
     }
   });
+  Ok(())
 }

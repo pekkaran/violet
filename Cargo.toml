@@ -8,6 +8,8 @@ edition = "2021"
 anyhow = "1.0"
 # Command line argument parsing.
 clap = { version = "3", features = ["derive"] }
+# More generic global variables.
+# TODO lazy_static = "1.4"
 # Logging facade.
 log = "0.4"
 # Logging implementation.
@@ -17,7 +19,7 @@ nalgebra = "0.30"
 # Deserialization.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# serde_yaml = "0.8" # TODO To be added.
+# TODO serde_yaml = "0.8"
 # Windowing library, including input handling.
 winit = "0.26"
 # Put pixel data in a (winit) window.
