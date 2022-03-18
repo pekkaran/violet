@@ -1,4 +1,5 @@
 mod all;
+mod detector;
 mod input;
 mod event_loop;
 mod tracker;
