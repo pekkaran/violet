@@ -8,12 +8,16 @@ pub struct Input {
 
 pub struct InputFrame<'a> {
   pub video: &'a VideoFrame,
-  pub time: f64,
 }
 
-pub enum InputData<'a> {
-  Gyroscope { time: f64, v: Vector3d },
-  Accelerometer { time: f64, v: Vector3d },
+pub struct InputData<'a> {
+  pub time: f64,
+  pub sensor: InputDataSensor<'a>,
+}
+
+pub enum InputDataSensor<'a> {
+  Gyroscope(Vector3d),
+  Accelerometer(Vector3d),
   Frame(InputFrame<'a>),
 }
 
@@ -57,8 +61,14 @@ impl Input {
           .ok_or(anyhow!("Sensor type is not a string."))?;
 
         match sensor_type {
-          "gyroscope" => return Ok(Some(InputData::Gyroscope { time, v })),
-          "accelerometer" => return Ok(Some(InputData::Accelerometer { time, v })),
+          "gyroscope" => return Ok(Some(InputData {
+            time,
+            sensor: InputDataSensor::Gyroscope(v),
+          })),
+          "accelerometer" => return Ok(Some(InputData {
+            time,
+            sensor: InputDataSensor::Accelerometer(v),
+          })),
           _ => {
             warn!("Unknown sensor type {}", sensor_type);
             continue;
@@ -69,9 +79,11 @@ impl Input {
         // let frames = frames.as_array().ok_or(anyhow!("Frames field is not an array."))?;
         let input_frame = InputFrame {
           video: self.video_input.read()?,
-          time,
         };
-        return Ok(Some(InputData::Frame(input_frame)));
+        return Ok(Some(InputData {
+          time,
+          sensor: InputDataSensor::Frame(input_frame),
+        }));
       }
       else if let Some(_) = value.get("groundTruth") {
         // Pass.

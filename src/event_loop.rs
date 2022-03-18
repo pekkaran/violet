@@ -63,10 +63,10 @@ pub fn handle_event(
 
   match args.input.next()? {
     Some(input_data) => {
-      match input_data {
-        InputData::Gyroscope { time: _, v: _ } => {},
-        InputData::Accelerometer { time: _, v: _ } => {}
-        InputData::Frame(ref frame) => {
+      match input_data.sensor {
+        InputDataSensor::Gyroscope(_) => {},
+        InputDataSensor::Accelerometer(_) => {}
+        InputDataSensor::Frame(ref frame) => {
           for i in 0..frame.video.height {
             if i >= window_height { continue }
             for j in 0..frame.video.width {

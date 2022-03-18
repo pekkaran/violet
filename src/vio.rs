@@ -2,7 +2,6 @@ use crate::all::*;
 
 pub struct Vio {
   tracker: Tracker,
-
 }
 
 impl Vio {
@@ -13,10 +12,10 @@ impl Vio {
   }
 
   pub fn process(&mut self, input_data: &InputData) {
-    match input_data {
-      InputData::Gyroscope { time: _, v: _ } => {},
-      InputData::Accelerometer { time: _, v: _ } => {}
-      InputData::Frame(ref frame) => {},
-    }
+    // match input_data {
+    //   InputData::Gyroscope { time: _, v: _ } => {},
+    //   InputData::Accelerometer { time: _, v: _ } => {}
+    //   InputData::Frame(ref frame) => {},
+    // }
   }
 }
