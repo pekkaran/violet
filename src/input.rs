@@ -76,7 +76,6 @@ impl Input {
         }
       }
       else if let Some(_frames) = value.get("frames") {
-        // let frames = frames.as_array().ok_or(anyhow!("Frames field is not an array."))?;
         let input_frame = InputFrame {
           video: self.video_input.read()?,
         };

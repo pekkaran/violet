@@ -20,6 +20,8 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 struct Args {
   #[clap(short)]
   input_folder: String,
+  // Could the parameters struct be flattened here to allow defining parameters
+  // at commandline?
 }
 
 fn handle_error(err: &anyhow::Error) {
@@ -35,11 +37,6 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-  env_logger::Builder::new()
-    .filter_level(LevelFilter::Info)
-    .format(util::format_log)
-    .init();
-
   let args = Args::parse();
   let input_folder_path = Path::new(&args.input_folder);
   let mut input = Input::new(&input_folder_path)?;
@@ -56,6 +53,12 @@ fn run() -> Result<()> {
     .build(&event_loop)
     .unwrap();
   let mut graphics_context = unsafe { GraphicsContext::new(window) }.unwrap();
+
+  // Start logging after winit setup to skip a debug print.
+  env_logger::Builder::new()
+    .filter_level(LevelFilter::Info)
+    .format(util::format_log)
+    .init();
 
   let mut buffer = vec![];
   let mut args = EventLoopArgs {

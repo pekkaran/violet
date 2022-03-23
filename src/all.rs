@@ -23,3 +23,4 @@ pub use {
 
 // Eigen-like aliases.
 pub type Vector3d = nalgebra::Vector3::<f64>;
+pub type Pixel = nalgebra::Vector2::<i32>;
