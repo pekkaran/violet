@@ -10,6 +10,8 @@ pub struct EventLoopArgs<'a> {
   pub buffer: &'a mut Vec<u32>,
   pub graphics_context: &'a mut GraphicsContext<Window>,
   pub vio: Vio,
+  pub step_mode: bool,
+  pub advance: bool,
 }
 
 pub fn handle_event(
@@ -48,10 +50,12 @@ pub fn handle_event(
           is_synthetic: _,
           device_id: _,
         } => {
+          args.advance = true;
           match keycode {
             VirtualKeyCode::Escape | VirtualKeyCode::Q => {
               *control_flow = ControlFlow::Exit;
             },
+            VirtualKeyCode::A => args.step_mode = !args.step_mode,
             _ => {}, // Other keys.
           }
         },
@@ -60,6 +64,8 @@ pub fn handle_event(
     },
     _ => {}, // Other events.
   }
+
+  if args.step_mode && !args.advance { return Ok(()) }
 
   match args.input.next()? {
     Some(input_data) => {
@@ -75,7 +81,16 @@ pub fn handle_event(
               args.buffer[i * window_width + j] = gray | (gray << 8) | (gray << 16);
             }
           }
+          let mut visualize_args = VisualizeArgs {
+            buffer: &mut args.buffer,
+            video_w: frame.video.width,
+            video_h: frame.video.height,
+            buffer_w: window_width,
+            buffer_h: window_height,
+          };
+          visualize(&mut visualize_args);
           args.graphics_context.window().request_redraw();
+          args.advance = false;
         },
       }
       args.vio.process(&input_data);

@@ -1,4 +1,5 @@
 mod all;
+mod debug;
 mod detector;
 mod input;
 mod event_loop;
@@ -6,9 +7,11 @@ mod tracker;
 mod util;
 mod video;
 mod vio;
+mod visualize;
 
 use all::*;
 
+#[macro_use] extern crate lazy_static;
 use clap::Parser;
 
 use softbuffer::GraphicsContext;
@@ -66,6 +69,8 @@ fn run() -> Result<()> {
     buffer: &mut buffer,
     graphics_context: &mut graphics_context,
     vio: Vio::new(),
+    step_mode: false,
+    advance: false,
   };
 
   event_loop.run_return(move |event, _, mut control_flow| {

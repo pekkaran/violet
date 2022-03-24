@@ -9,7 +9,7 @@ anyhow = "1.0"
 # Command line argument parsing.
 clap = { version = "3", features = ["derive"] }
 # More generic global variables.
-# TODO lazy_static = "1.4"
+lazy_static = "1.4"
 # Logging facade.
 log = "0.4"
 # Logging implementation.

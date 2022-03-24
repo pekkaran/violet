@@ -1,7 +1,7 @@
 use crate::all::*;
 
 // Values 9 and 12 are popular, allowing quick rejection logic.
-const FAST_VARIANT_N: usize = 12;
+const FAST_VARIANT_N: usize = 9;
 
 // A Bresenham circle.
 const CIRCLE_RADIUS: usize = 3;
@@ -30,6 +30,10 @@ impl Detector {
         detections.push(Pixel::new(x as i32, y as i32));
       }
     }
+
+    let d = &mut DEBUG_DATA.lock().unwrap().detections;
+    d.clear();
+    d.extend(detections.iter());
   }
 
   fn detect_at_pixel(&mut self, x: i32, y: i32, frame: &VideoFrame) -> bool {
