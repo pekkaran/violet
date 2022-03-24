@@ -4,6 +4,7 @@ mod detector;
 mod input;
 mod event_loop;
 mod tracker;
+mod types;
 mod util;
 mod video;
 mod vio;

@@ -6,6 +6,7 @@ pub use crate::{
   event_loop::*,
   input::*,
   tracker::*,
+  types::*,
   util::*,
   video::*,
   vio::*,
@@ -23,7 +24,3 @@ pub use {
   nalgebra::DMatrix,
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
 };
-
-// Eigen-like aliases.
-pub type Vector3d = nalgebra::Vector3::<f64>;
-pub type Pixel = nalgebra::Vector2::<i32>;

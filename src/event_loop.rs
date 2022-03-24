@@ -81,19 +81,22 @@ pub fn handle_event(
               args.buffer[i * window_width + j] = gray | (gray << 8) | (gray << 16);
             }
           }
-          let mut visualize_args = VisualizeArgs {
-            buffer: &mut args.buffer,
-            video_w: frame.video.width,
-            video_h: frame.video.height,
-            buffer_w: window_width,
-            buffer_h: window_height,
-          };
-          visualize(&mut visualize_args);
-          args.graphics_context.window().request_redraw();
-          args.advance = false;
         },
       }
       args.vio.process(&input_data);
+
+      if let InputDataSensor::Frame(ref frame) = input_data.sensor {
+        let mut visualize_args = VisualizeArgs {
+          buffer: &mut args.buffer,
+          video_w: frame.video.width,
+          video_h: frame.video.height,
+          buffer_w: window_width,
+          buffer_h: window_height,
+        };
+        visualize(&mut visualize_args);
+        args.graphics_context.window().request_redraw();
+        args.advance = false;
+      }
     },
     None => *control_flow = ControlFlow::Exit,
   }
