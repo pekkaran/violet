@@ -1,34 +1,38 @@
 use crate::all::*;
 
+const MAX_FRAMES_IN_MEMORY: usize = 2;
+
 pub struct Vio {
   tracker: Tracker,
-  // last_time: Option<f64>,
+  frames: Vec<Frame>,
 }
 
 impl Vio {
   pub fn new() -> Vio {
     Vio {
       tracker: Tracker::new(),
-      // last_time: None,
+      frames: vec![],
     }
   }
 
   pub fn process(&mut self, input_data: &InputData) {
-    // TODO Acc and gyro often share timestamps, this is not good.
-    // if let Some(last_time) = self.last_time {
-    //   if input_data.time <= last_time {
-    //     warn!("Ignoring unordered/duplicated sensor sample: {}.", input_data.time);
-    //     return;
-    //   }
-    // }
-    // self.last_time = Some(input_data.time);
-
     match input_data.sensor {
       InputDataSensor::Frame(ref frame) => {
-        self.tracker.process(frame);
+        self.process_frame(frame);
       },
       InputDataSensor::Gyroscope(_) => {},
       InputDataSensor::Accelerometer(_) => {}
     }
+  }
+
+  fn process_frame(&mut self, frame: &InputFrame) {
+    self.frames.push(Frame::new(frame));
+    assert!(MAX_FRAMES_IN_MEMORY >= 1);
+    if self.frames.len() > MAX_FRAMES_IN_MEMORY {
+      self.frames.remove(0);
+    }
+    let frame = self.frames.iter().last().unwrap();
+
+    self.tracker.process(frame);
   }
 }

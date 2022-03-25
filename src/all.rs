@@ -4,6 +4,7 @@ pub use crate::{
   debug::*,
   detector::*,
   event_loop::*,
+  frame::*,
   input::*,
   tracker::*,
   types::*,

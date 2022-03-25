@@ -13,8 +13,8 @@ impl Tracker {
     }
   }
 
-  pub fn process(&mut self, frame: &InputFrame) {
-    self.detector.process(&frame.video, &mut self.detections);
+  pub fn process(&mut self, frame: &Frame) {
+    self.detector.process(frame, &mut self.detections);
     // dbg!(&self.detections);
   }
 }

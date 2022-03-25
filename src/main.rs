@@ -1,6 +1,7 @@
 mod all;
 mod debug;
 mod detector;
+mod frame;
 mod input;
 mod event_loop;
 mod tracker;
@@ -58,7 +59,7 @@ fn run() -> Result<()> {
     .unwrap();
   let mut graphics_context = unsafe { GraphicsContext::new(window) }.unwrap();
 
-  // Start logging after winit setup to skip a debug print.
+  // Start logging after winit setup to skip a specific useless debug print.
   env_logger::Builder::new()
     .filter_level(LevelFilter::Info)
     .format(util::format_log)

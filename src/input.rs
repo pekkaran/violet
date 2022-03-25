@@ -7,6 +7,7 @@ pub struct Input {
 }
 
 pub struct InputFrame<'a> {
+  // Maybe a Vec<> here for stereo input?
   pub video: &'a VideoFrame,
 }
 
@@ -35,7 +36,8 @@ impl Input {
 
   // Not using the Iterator trait here because "streaming iterators" are not
   // supported by the trait. Specifically, the yielded items are not allowed
-  // to borrow from the `Input` struct, but the InputData::Frame variant does that.
+  // to borrow from the `Input` struct, but the InputData::Frame variant does
+  // that to avoid allocating a new buffers for the images.
   pub fn next(&mut self) -> Result<Option<InputData>> {
     loop {
       self.line.clear();

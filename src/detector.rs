@@ -12,25 +12,25 @@ const CIRCLE: [[i32; 2]; 16] = [
 
 pub struct Detector {
   // TODO move to parameters
-  pub threshold: i16,
+  pub start_threshold: i16,
   mask: Vec<bool>,
 }
 
 impl Detector {
   pub fn new() -> Detector {
     Detector {
-      threshold: 64,
+      start_threshold: 64,
       mask: vec![],
     }
   }
 
-  pub fn process(&mut self, frame: &VideoFrame, detections: &mut Vec<Pixel>) {
+  pub fn process(&mut self, frame: &Frame, detections: &mut Vec<Pixel>) {
     detections.clear();
     self.mask.clear();
     for _ in 0 .. (frame.width * frame.height) {
       self.mask.push(false);
     }
-    let mut threshold = self.threshold;
+    let mut threshold = self.start_threshold;
     let mask_radius = ((frame.width.max(frame.height) as f32) / 100.0).round() as i32;
     for _ in 0..4 {
       for x in CIRCLE_RADIUS .. (frame.width - CIRCLE_RADIUS) {
@@ -55,7 +55,7 @@ impl Detector {
     }
   }
 
-  fn detect_at_pixel(&mut self, x: i32, y: i32, frame: &VideoFrame, threshold: i16) -> bool {
+  fn detect_at_pixel(&mut self, x: i32, y: i32, frame: &Frame, threshold: i16) -> bool {
     let center_value = value(x, y, frame);
     if continuous(x, y, frame, |v| v < center_value - threshold) { return true }
     if continuous(x, y, frame, |v| v > center_value + threshold) { return true }
@@ -63,7 +63,7 @@ impl Detector {
   }
 }
 
-fn continuous<F: Fn(i16) -> bool>(x: i32, y: i32, frame: &VideoFrame, f: F) -> bool {
+fn continuous<F: Fn(i16) -> bool>(x: i32, y: i32, frame: &Frame, f: F) -> bool {
   // Quick rejection for 9 and 12 variants.
   if !f(value(x + 3, y, frame)) && !f(value(x - 3, y, frame)) { return false }
 
@@ -110,7 +110,7 @@ impl Iterator for CircleIterator {
   }
 }
 
-fn value(x: i32, y: i32, frame: &VideoFrame) -> i16 {
+fn value(x: i32, y: i32, frame: &Frame) -> i16 {
   frame.data[y as usize * frame.width + x as usize] as i16
 }
 
