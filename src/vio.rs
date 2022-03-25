@@ -26,11 +26,13 @@ impl Vio {
   }
 
   fn process_frame(&mut self, frame: &InputFrame) {
-    self.frames.push(Frame::new(frame));
+    let mut unused_frame = None;
+    if self.frames.len() >= MAX_FRAMES_IN_MEMORY {
+      unused_frame = Some(self.frames.remove(0));
+    };
+
+    self.frames.push(Frame::new(frame, unused_frame));
     assert!(MAX_FRAMES_IN_MEMORY >= 1);
-    if self.frames.len() > MAX_FRAMES_IN_MEMORY {
-      self.frames.remove(0);
-    }
     let frame = self.frames.iter().last().unwrap();
 
     self.tracker.process(frame);
