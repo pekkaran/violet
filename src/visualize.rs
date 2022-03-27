@@ -2,7 +2,7 @@ use crate::all::*;
 
 pub const VISUALIZE_FEATURES: bool = true;
 pub const VISUALIZE_MASK: bool = false;
-pub const VISUALIZE_PYRAMID: bool = false;
+pub const VISUALIZE_PYRAMID: bool = true;
 
 pub struct VisualizeArgs<'a> {
   pub buffer: &'a mut Vec<u32>,
@@ -31,9 +31,11 @@ fn draw_square(args: &mut VisualizeArgs, p: &Pixel, v: u32, r: i32) {
 
 fn draw_buffer(
   args: &mut VisualizeArgs,
+  // Data to be drawn.
   data: &[u8],
   w: usize,
   h: usize,
+  // Top-left coordinates of drawing target.
   ax: usize,
   ay: usize,
 ) {
@@ -54,8 +56,7 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   if VISUALIZE_PYRAMID {
     let mut a = [0, 0];
     for (i, level) in frame.pyramid.levels.iter().enumerate() {
-      let dimension = i % 2;
-      a[dimension] += frame.pyramid.size(i)[dimension];
+      a[i % 2] += frame.pyramid.size(i)[i % 2];
       let size = frame.pyramid.size(i + 1);
       draw_buffer(args, level, size[0], size[1], a[0], a[1]);
     }

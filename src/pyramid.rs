@@ -1,5 +1,7 @@
 use crate::all::*;
 
+const NAIVE_DOWNSCALE: bool = false;
+
 pub struct Pyramid {
   pub levels: Vec<Vec<u8>>,
   size: [usize; 2],
@@ -59,31 +61,38 @@ fn downscale(
   w: usize,
   h: usize,
 ) -> Result<()> {
+  assert_eq!(parent.len(), w * h);
   if w % 2 != 0 || h % 2 != 0 {
     bail!("Cannot downscale image with dimensions {}x{}", w, h);
   }
+  let w = w as i32;
+  let h = h as i32;
   let w2 = w / 2;
   let h2 = h / 2;
   child.clear();
-  assert_eq!(parent.len(), w * h);
 
-  #[inline(always)]
-  fn value(x: usize, y: usize, w: usize, data: &[u8]) -> u16 {
-    data[y as usize * w + x as usize] as u16
-  }
+  let v = |mut x: i32, mut y: i32| -> u16 {
+    if x < 0 { x = 0 }
+    if y < 0 { y = 0 }
+    if x >= w { x = w }
+    if y >= h { y = h }
+    parent[((y * w) + x) as usize] as u16
+  };
 
   for y in 0..h2 {
     let y2 = 2 * y;
     for x in 0..w2 {
       let x2 = 2 * x;
-      let v = (
-        value(x2, y2, w, parent)
-        + value(x2 + 1, y2, w, parent)
-        + value(x2, y2 + 1, w, parent)
-        + value(x2 + 1, y2 + 1, w, parent)
-        + 2 // For rounded division.
-      ) / 4;
-      child.push(v as u8);
+      let value = if NAIVE_DOWNSCALE {
+        (v(x2, y2) + v(x2 + 1, y2) + v(x2, y2 + 1) + v(x2 + 1, y2 + 1) + 2) / 4
+      }
+      else {
+        // Low-pass filter and possibly more accurate coordinate indexing(?).
+        v(x2, y2) / 4
+          + (v(x2 + 1, y2) + v(x2 - 1, y2) + v(x2, y2 + 1) + v(x2, y2 - 1)) / 8
+          + (v(x2 + 1, y2 + 1) + v(x2 - 1, y2 - 1) + v(x2 - 1, y2 + 1) + v(x2 + 1, y2 - 1)) / 16
+      };
+      child.push(value as u8);
     }
   }
   Ok(())
