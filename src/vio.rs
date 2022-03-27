@@ -9,11 +9,11 @@ pub struct Vio {
 }
 
 impl Vio {
-  pub fn new() -> Vio {
-    Vio {
-      tracker: Tracker::new(),
+  pub fn new() -> Result<Vio> {
+    Ok(Vio {
+      tracker: Tracker::new()?,
       frames: vec![],
-    }
+    })
   }
 
   pub fn get_frames(&self) -> &[Frame] {
@@ -39,9 +39,10 @@ impl Vio {
     };
 
     self.frames.push(Frame::new(frame, unused_frame)?);
-    let frame = self.frames.iter().last().unwrap();
 
-    self.tracker.process(frame);
+    let frame0 = self.frames.iter().rev().nth(1);
+    let frame1 = self.frames.iter().last().unwrap();
+    self.tracker.process(frame0, frame1);
     Ok(())
   }
 }

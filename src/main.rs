@@ -5,6 +5,7 @@ mod frame;
 mod input;
 mod event_loop;
 mod optical_flow;
+mod parameters;
 mod pyramid;
 mod tracker;
 mod types;
@@ -27,8 +28,8 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 struct Args {
   #[clap(short)]
   input_folder: String,
-  // Could the parameters struct be flattened here to allow defining parameters
-  // at commandline?
+  #[clap(flatten)]
+  parameter_set: ParameterSet,
 }
 
 fn handle_error(err: &anyhow::Error) {
@@ -45,6 +46,8 @@ fn main() {
 
 fn run() -> Result<()> {
   let args = Args::parse();
+  *PARAMETER_SET.lock().unwrap() = args.parameter_set;
+
   let input_folder_path = Path::new(&args.input_folder);
   let mut input = Input::new(&input_folder_path)?;
 
@@ -72,7 +75,7 @@ fn run() -> Result<()> {
     input: &mut input,
     buffer: &mut buffer,
     graphics_context: &mut graphics_context,
-    vio: Vio::new(),
+    vio: Vio::new()?,
     step_mode: false,
     advance: false,
   };

@@ -1,7 +1,5 @@
 use crate::all::*;
 
-pub const PYRAMID_LEVEL_COUNT: usize = 3;
-
 // Data derived from single frame input to `Vio::process()`.
 pub struct Frame {
   pub data: Vec<u8>,
@@ -25,8 +23,9 @@ impl Frame {
       (input_frame.video.data.clone(), None)
     };
 
+    let p = &*PARAMETER_SET.lock().unwrap();
     Ok(Frame {
-      pyramid: Pyramid::new(&input_frame.video, unused_pyramid, PYRAMID_LEVEL_COUNT)?,
+      pyramid: Pyramid::new(&input_frame.video, unused_pyramid, p.lk_levels)?,
       data,
       width: input_frame.video.width,
       height: input_frame.video.height,

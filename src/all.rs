@@ -7,6 +7,7 @@ pub use crate::{
   frame::*,
   input::*,
   optical_flow::*,
+  parameters::*,
   pyramid::*,
   tracker::*,
   types::*,
@@ -24,6 +25,6 @@ pub use {
     sync::Mutex,
   },
   log::{debug, error, info, warn, LevelFilter},
-  nalgebra::DMatrix,
+  nalgebra::{dmatrix, dvector, DMatrix},
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
 };

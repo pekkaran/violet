@@ -36,7 +36,7 @@ fn compute_levels(
   level_count: usize,
 ) -> Result<Vec<Vec<u8>>> {
   assert!(level_count > 0);
-  let mut levels = unused_levels.unwrap_or(vec![vec![]; PYRAMID_LEVEL_COUNT]);
+  let mut levels = unused_levels.unwrap_or(vec![vec![]; level_count]);
   let mut width = video_frame.width;
   let mut height = video_frame.height;
   downscale(&video_frame.data, &mut levels[0], width, height)?;
