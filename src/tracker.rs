@@ -3,7 +3,7 @@ use crate::all::*;
 pub struct Tracker {
   detector: Detector,
   optical_flow: OpticalFlow,
-  detections: Vec<Pixel>,
+  detections: Vec<Vector2i>,
 }
 
 impl Tracker {

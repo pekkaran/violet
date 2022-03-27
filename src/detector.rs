@@ -24,7 +24,7 @@ impl Detector {
     }
   }
 
-  pub fn process(&mut self, frame: &Frame, detections: &mut Vec<Pixel>) {
+  pub fn process(&mut self, frame: &Frame, detections: &mut Vec<Vector2i>) {
     detections.clear();
     self.mask.clear();
     for _ in 0 .. (frame.width * frame.height) {
@@ -37,7 +37,7 @@ impl Detector {
         for y in CIRCLE_RADIUS .. (frame.height - CIRCLE_RADIUS) {
           if self.mask[y * frame.width + x] { continue }
           if !self.detect_at_pixel(x as i32, y as i32, frame, threshold) { continue }
-          detections.push(Pixel::new(x as i32, y as i32));
+          detections.push(Vector2i::new(x as i32, y as i32));
           add_mask(&mut self.mask, x as i32, y as i32, frame.width, frame.height, mask_radius);
         }
       }

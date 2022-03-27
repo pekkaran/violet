@@ -6,6 +6,6 @@ lazy_static! {
 
 #[derive(Default)]
 pub struct DebugData {
-  pub detections: Vec<Pixel>,
+  pub detections: Vec<Vector2i>,
   pub detection_mask: Vec<bool>,
 }
