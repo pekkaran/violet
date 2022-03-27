@@ -3,6 +3,7 @@ use crate::all::*;
 const MAX_FRAMES_IN_MEMORY: usize = 2;
 
 pub struct Vio {
+  // Use private fields to clarify this struct would form the main API.
   tracker: Tracker,
   frames: Vec<Frame>,
 }
@@ -13,6 +14,10 @@ impl Vio {
       tracker: Tracker::new(),
       frames: vec![],
     }
+  }
+
+  pub fn get_frames(&self) -> &[Frame] {
+    &self.frames
   }
 
   pub fn process(&mut self, input_data: &InputData) -> Result<()> {

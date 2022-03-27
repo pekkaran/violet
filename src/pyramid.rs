@@ -2,6 +2,7 @@ use crate::all::*;
 
 pub struct Pyramid {
   pub levels: Vec<Vec<u8>>,
+  size: [usize; 2],
 }
 
 impl Pyramid {
@@ -15,8 +16,15 @@ impl Pyramid {
         video_frame,
         unused_pyramid.map(|x| x.levels),
         level_count,
-      )?
+      )?,
+      size: [video_frame.width, video_frame.height],
     })
+  }
+
+  // Argument 0 gives size of the original non-down scaled image.
+  pub fn size(&self, level: usize) -> [usize; 2] {
+    let n = usize::pow(2, level as u32);
+    [self.size[0] / n, self.size[1] / n]
   }
 }
 

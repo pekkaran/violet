@@ -69,31 +69,18 @@ pub fn handle_event(
 
   match args.input.next()? {
     Some(input_data) => {
-      match input_data.sensor {
-        InputDataSensor::Gyroscope(_) => {},
-        InputDataSensor::Accelerometer(_) => {}
-        InputDataSensor::Frame(ref frame) => {
-          for i in 0..frame.video.height {
-            if i >= window_height { continue }
-            for j in 0..frame.video.width {
-              if j >= window_width { continue }
-              let gray = frame.video.data[i * frame.video.width + j] as u32;
-              args.buffer[i * window_width + j] = gray | (gray << 8) | (gray << 16);
-            }
-          }
-        },
-      }
       args.vio.process(&input_data)?;
 
       if let InputDataSensor::Frame(ref frame) = input_data.sensor {
         let mut visualize_args = VisualizeArgs {
           buffer: &mut args.buffer,
+          frames: args.vio.get_frames(),
           video_w: frame.video.width,
           video_h: frame.video.height,
           buffer_w: window_width,
           buffer_h: window_height,
         };
-        visualize(&mut visualize_args);
+        visualize(&mut visualize_args)?;
         args.graphics_context.window().request_redraw();
         args.advance = false;
       }
