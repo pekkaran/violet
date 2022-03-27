@@ -110,6 +110,7 @@ impl Iterator for CircleIterator {
   }
 }
 
+#[inline(always)]
 fn value(x: i32, y: i32, frame: &Frame) -> i16 {
   frame.data[y as usize * frame.width + x as usize] as i16
 }

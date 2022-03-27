@@ -83,7 +83,7 @@ pub fn handle_event(
           }
         },
       }
-      args.vio.process(&input_data);
+      args.vio.process(&input_data)?;
 
       if let InputDataSensor::Frame(ref frame) = input_data.sensor {
         let mut visualize_args = VisualizeArgs {

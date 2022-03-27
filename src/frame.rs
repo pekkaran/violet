@@ -11,7 +11,10 @@ pub struct Frame {
 }
 
 impl Frame {
-  pub fn new(input_frame: &InputFrame, unused_frame: Option<Frame>) -> Frame {
+  pub fn new(
+    input_frame: &InputFrame,
+    unused_frame: Option<Frame>,
+  ) -> Result<Frame> {
     let (data, unused_pyramid) = if let Some(mut unused_frame) = unused_frame {
       // Move data buffer from old unused frame to the new frame to avoid allocation.
       unused_frame.data.clear();
@@ -22,11 +25,11 @@ impl Frame {
       (input_frame.video.data.clone(), None)
     };
 
-    Frame {
-      pyramid: Pyramid::new(&data, unused_pyramid, PYRAMID_LEVEL_COUNT),
+    Ok(Frame {
+      pyramid: Pyramid::new(&input_frame.video, unused_pyramid, PYRAMID_LEVEL_COUNT)?,
       data,
       width: input_frame.video.width,
       height: input_frame.video.height,
-    }
+    })
   }
 }
