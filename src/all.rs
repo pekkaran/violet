@@ -6,6 +6,7 @@ pub use crate::{
   event_loop::*,
   frame::*,
   input::*,
+  optical_flow::*,
   pyramid::*,
   tracker::*,
   types::*,

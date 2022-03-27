@@ -97,4 +97,3 @@ fn downscale(
   }
   Ok(())
 }
-

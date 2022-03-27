@@ -4,6 +4,7 @@ mod detector;
 mod frame;
 mod input;
 mod event_loop;
+mod optical_flow;
 mod pyramid;
 mod tracker;
 mod types;
