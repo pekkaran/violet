@@ -4,7 +4,7 @@ const NAIVE_DOWNSCALE: bool = false;
 
 pub struct Pyramid {
   pub levels: Vec<Vec<u8>>,
-  size: [usize; 2],
+  pub size: [usize; 2],
 }
 
 impl Pyramid {
@@ -35,8 +35,8 @@ fn compute_levels(
   unused_levels: Option<Vec<Vec<u8>>>,
   level_count: usize,
 ) -> Result<Vec<Vec<u8>>> {
-  assert!(level_count > 0);
   let mut levels = unused_levels.unwrap_or(vec![vec![]; level_count]);
+  if level_count == 0 { return Ok(levels) }
   let mut width = video_frame.width;
   let mut height = video_frame.height;
   downscale(&video_frame.data, &mut levels[0], width, height)?;
