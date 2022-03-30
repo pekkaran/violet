@@ -5,6 +5,7 @@
 
 use crate::all::*;
 
+#[allow(non_snake_case)]
 pub struct OpticalFlow {
   lk_iters: usize,
   lk_levels: usize,
@@ -57,15 +58,28 @@ impl OpticalFlow {
     feature0: Vector2d,
   ) -> (Vector2d, bool) {
     let r = (self.lk_win_size - 1) / 2;
-    let mut _g = Vector2d::zeros();
+    let mut g = Vector2d::zeros();
+    let mut d = Vector2d::zeros();
     for L in (0..self.lk_levels + 1).rev() {
       let u = feature0 / u32::pow(2, L as u32) as f64;
       let range = integration_range(frame0, u, r, 1);
-      scharr(frame0, u, range, 0, &mut self.Ix, &mut self.grid);
-      scharr(frame0, u, range, 1, &mut self.Iy, &mut self.grid);
+      scharr(frame0, u, range, &mut self.Ix, &mut self.Iy, &mut self.grid);
+      // let mut G = spatial_gradient();
+      let mut nu = Vector2d::zeros();
+      for _ in 0..self.lk_iters {
+        // Compute new range based on g and nu. If the range has become smaller,
+        //   recompute G.
+        // let It = image_difference(range, grid, frame1);
+        // let b = image_mismatch();
+        // let eta = G.inverse() * b;
+        let eta = Vector2d::zeros(); // TODO Remove.
+        nu += eta;
+        // if nu < self.lk_term { break }
+      }
+      d = nu;
+      if L > 0 { g = 2. * (g + d) }
     }
-
-    (feature0, true) // TODO
+    (feature0 + g + d, true)
   }
 }
 
@@ -91,24 +105,59 @@ fn scharr(
   frame: &Frame,
   u: Vector2d,
   range: [[i16; 2]; 2],
-  dim: usize,
-  out: &mut Vectord,
+  // TODO These should be in Matrixd grid form so that the integration ranges
+  // can be changed later.
+  out_x: &mut Vectord,
+  out_y: &mut Vectord,
+  // Workspace.
   grid: &mut Matrixd,
 ) {
-  *grid = DMatrix::zeros((range[1][1] - range[1][0] + 1) as usize, (range[0][1] - range[0][0] + 1) as usize);
-  for (y_ind, y) in (range[1][0]..=range[1][1]).enumerate() {
-    for (x_ind, x) in (range[0][0]..=range[0][1]).enumerate() {
-      grid[(y_ind, x_ind)] = bilinear(frame, u + Vector2d::new(u[0] + x as f64, u[1] + y as f64));
+  let grange = [[range[0][0] - 1, range[0][1] + 1], [range[1][0] - 1, range[1][1] + 1]];
+  // TODO Unclear if these kind of statements cause allocations.
+  *grid = DMatrix::zeros((grange[1][1] - grange[1][0] + 1) as usize, (grange[0][1] - grange[0][0] + 1) as usize);
+  for (y_ind, y) in (grange[1][0]..=grange[1][1]).enumerate() {
+    for (x_ind, x) in (grange[0][0]..=grange[0][1]).enumerate() {
+      grid[(y_ind, x_ind)] = bilinear(frame, u + Vector2d::new(x as f64, y as f64));
     }
   }
-  // TODO Compute Scharr on the grid. Remember normalization (1/32?).
+  *out_x = Vectord::zeros((grid.nrows() - 1) * (grid.ncols() - 1));
+  *out_y = Vectord::zeros((grid.nrows() - 1) * (grid.ncols() - 1));
+  let mut i = 0;
+  for y in 1..(grid.nrows() - 1) {
+    for x in 1..(grid.ncols() - 1) {
+      out_x[i] = (10. * grid[(y, x + 1)]
+        + 3. * grid[(y + 1, x + 1)]
+        + 3. * grid[(y - 1, x + 1)]
+        - 10. * grid[(y, x - 1)]
+        - 3. * grid[(y + 1, x - 1)]
+        - 3. * grid[(y - 1, x - 1)]
+      ) / 32.;
+      out_y[i] = (10. * grid[(y + 1, x)]
+        + 3. * grid[(y + 1, x + 1)]
+        + 3. * grid[(y + 1, x - 1)]
+        - 10. * grid[(y - 1, x)]
+        - 3. * grid[(y - 1, x + 1)]
+        - 3. * grid[(y - 1, x - 1)]
+      ) / 32.;
+      i += 1;
+    }
+  }
 }
 
 #[inline(always)]
 fn bilinear(frame: &Frame, u: Vector2d) -> f64 {
-  // TODO cap coordinates outside image boundaries? The PDF maybe suggested to
-  // instead omit values from the sums, but make sure such sums are compatible.
-  0. // TODO
+  assert!(u[0] >= 0.0 && u[0] <= frame.width as f64 - 1.);
+  assert!(u[1] >= 0.0 && u[1] <= frame.height as f64 - 1.);
+  let x0 = u[0] as usize;
+  let y0 = u[1] as usize;
+  let x1 = x0 + 1;
+  let y1 = y0 + 1;
+  let xa = u[0].fract();
+  let ya = u[1].fract();
+  (1. - xa) * (1. - ya) * frame.data[y0 * frame.width + x0] as f64
+    + xa * (1. - ya) * frame.data[y0 * frame.width + x1] as f64
+    + (1. - xa) * ya * frame.data[y1 * frame.width + x0] as f64
+    + xa * ya * frame.data[y1 * frame.width + x1] as f64
 }
 
 
