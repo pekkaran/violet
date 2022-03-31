@@ -67,7 +67,7 @@ impl OpticalFlow {
       let u = feature0 / u32::pow(2, L as u32) as f64;
       let range = integration_range(frame0, u, r, 1);
       scharr(frame0, u, range, &mut self.Ix, &mut self.Iy, &mut self.grid);
-      // let mut G = spatial_gradient(&range);
+      let mut G = spatial_gradient(range, &self.Ix, &self.Iy);
       let mut nu = Vector2d::zeros();
       for _ in 0..self.lk_iters {
         // Compute new range based on g and nu. If the range has become smaller,
@@ -86,13 +86,26 @@ impl OpticalFlow {
   }
 }
 
-// fn spatial_gradient(
-//   range: Range,
-//   Ix: &Matrixd,
-//   Iy: &Matrixd,
-// ) -> Matrix2d {
-//
-// }
+fn spatial_gradient(
+  // For now assuming range is the same as around the source feature.
+  _range: Range,
+  Ix: &Matrixd,
+  Iy: &Matrixd,
+) -> Matrix2d {
+  assert_eq!(Ix.nrows(), Iy.nrows());
+  assert_eq!(Ix.ncols(), Iy.ncols());
+  let mut x2 = 0.;
+  let mut y2 = 0.;
+  let mut xy = 0.;
+  for y in 0..Ix.nrows() {
+    for x in 0..Ix.ncols() {
+      x2 += Ix[(y, x)] * Ix[(y, x)];
+      y2 += Iy[(y, x)] * Iy[(y, x)];
+      xy += Ix[(y, x)] * Iy[(y, x)];
+    }
+  }
+  Matrix2d::new(x2, xy, xy, y2)
+}
 
 // Returns closed range of integer steps that can be takes without going outside
 // the image borders.
