@@ -5,13 +5,16 @@
 
 use crate::all::*;
 
+type Range = [[i16; 2]; 2];
+
 #[allow(non_snake_case)]
 pub struct OpticalFlow {
   lk_iters: usize,
   lk_levels: usize,
   lk_win_size: usize,
-  Ix: Vectord,
-  Iy: Vectord,
+  Ix: Matrixd,
+  Iy: Matrixd,
+  // Workspace.
   grid: Matrixd,
 }
 
@@ -28,8 +31,8 @@ impl OpticalFlow {
       lk_iters: p.lk_iters,
       lk_levels: p.lk_levels,
       lk_win_size: p.lk_win_size,
-      Ix: dvector![],
-      Iy: dvector![],
+      Ix: DMatrix::zeros(p.lk_win_size, p.lk_win_size),
+      Iy: DMatrix::zeros(p.lk_win_size, p.lk_win_size),
       grid: DMatrix::zeros(p.lk_win_size, p.lk_win_size),
     })
   }
@@ -64,7 +67,7 @@ impl OpticalFlow {
       let u = feature0 / u32::pow(2, L as u32) as f64;
       let range = integration_range(frame0, u, r, 1);
       scharr(frame0, u, range, &mut self.Ix, &mut self.Iy, &mut self.grid);
-      // let mut G = spatial_gradient();
+      // let mut G = spatial_gradient(&range);
       let mut nu = Vector2d::zeros();
       for _ in 0..self.lk_iters {
         // Compute new range based on g and nu. If the range has become smaller,
@@ -83,6 +86,14 @@ impl OpticalFlow {
   }
 }
 
+// fn spatial_gradient(
+//   range: Range,
+//   Ix: &Matrixd,
+//   Iy: &Matrixd,
+// ) -> Matrix2d {
+//
+// }
+
 // Returns closed range of integer steps that can be takes without going outside
 // the image borders.
 fn integration_range(
@@ -90,7 +101,7 @@ fn integration_range(
   u: Vector2d,
   r: usize,
   padding: i16,
-) -> [[i16; 2]; 2] {
+) -> Range {
   let r = r as i16;
   let mut range = [[0, 0], [0, 0]];
   for i in 0..2 {
@@ -104,11 +115,9 @@ fn integration_range(
 fn scharr(
   frame: &Frame,
   u: Vector2d,
-  range: [[i16; 2]; 2],
-  // TODO These should be in Matrixd grid form so that the integration ranges
-  // can be changed later.
-  out_x: &mut Vectord,
-  out_y: &mut Vectord,
+  range: Range,
+  out_x: &mut Matrixd,
+  out_y: &mut Matrixd,
   // Workspace.
   grid: &mut Matrixd,
 ) {
@@ -120,26 +129,24 @@ fn scharr(
       grid[(y_ind, x_ind)] = bilinear(frame, u + Vector2d::new(x as f64, y as f64));
     }
   }
-  *out_x = Vectord::zeros((grid.nrows() - 1) * (grid.ncols() - 1));
-  *out_y = Vectord::zeros((grid.nrows() - 1) * (grid.ncols() - 1));
-  let mut i = 0;
+  *out_x = Matrixd::zeros(grid.nrows() - 2, grid.ncols() - 2);
+  *out_y = Matrixd::zeros(grid.nrows() - 2, grid.ncols() - 2);
   for y in 1..(grid.nrows() - 1) {
     for x in 1..(grid.ncols() - 1) {
-      out_x[i] = (10. * grid[(y, x + 1)]
+      out_x[(y - 1, x - 1)] = (10. * grid[(y, x + 1)]
         + 3. * grid[(y + 1, x + 1)]
         + 3. * grid[(y - 1, x + 1)]
         - 10. * grid[(y, x - 1)]
         - 3. * grid[(y + 1, x - 1)]
         - 3. * grid[(y - 1, x - 1)]
       ) / 32.;
-      out_y[i] = (10. * grid[(y + 1, x)]
+      out_y[(y - 1, x - 1)] = (10. * grid[(y + 1, x)]
         + 3. * grid[(y + 1, x + 1)]
         + 3. * grid[(y + 1, x - 1)]
         - 10. * grid[(y - 1, x)]
         - 3. * grid[(y - 1, x + 1)]
         - 3. * grid[(y - 1, x - 1)]
       ) / 32.;
-      i += 1;
     }
   }
 }
