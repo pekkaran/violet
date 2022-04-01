@@ -11,8 +11,8 @@ pub struct VisualizeArgs<'a> {
 
 #[inline(always)]
 fn draw_pixel(args: &mut VisualizeArgs, p: &Vector2i, v: u32) {
-  if p[0] < 0 || p[0] >= args.buffer_w as i32 || p[0] >= args.video_w as i32 { return }
-  if p[1] < 0 || p[1] >= args.buffer_h as i32 || p[1] >= args.video_h as i32 { return }
+  if p[0] < 0 || p[0] >= args.buffer_w as i32 { return }
+  if p[1] < 0 || p[1] >= args.buffer_h as i32 { return }
   args.buffer[p[1] as usize * args.buffer_w + p[0] as usize] = v;
 }
 
@@ -67,6 +67,13 @@ fn draw_buffer(
 }
 
 pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
+  // Clear buffer.
+  for y in 0..args.buffer_h {
+    for x in 0..args.buffer_w {
+      args.buffer[y * args.buffer_w + x] = 0;
+    }
+  }
+
   let frame = args.frames.iter().last().ok_or(anyhow!("Cannot visualize before processing the first frame."))?;
   let fc0 = &frame.cameras[0];
   let fc1 = &frame.cameras[1];
@@ -92,12 +99,23 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   }
   if p.show_features {
     for p in &d.detections {
-      draw_square(args, p, 255 * 255, 3);
+      draw_square(args, &from_f64(p), 255 * 255, 3);
     }
   }
-  if p.show_flow {
+
+  if [p.show_flow0, p.show_flow1, p.show_flow2].iter().map(|x| *x as usize).sum::<usize>() > 1 {
+    warn!("Only one optical flow visualization is supported at a time.");
+  }
+  if p.show_flow0 {
     for (p0, p1) in &d.flow {
       draw_line(args, from_f64(p0), from_f64(p1), 255 * 255);
+      draw_square(args, &from_f64(p1), 255 * 255, 3);
+    }
+  }
+  else if p.show_flow1 || p.show_flow2 {
+    let ax = Vector2d::new(fc0.width as f64, 0.);
+    for (p0, p1) in &d.flow {
+      draw_line(args, from_f64(&(p0 + ax)), from_f64(p1), 255 * 255);
       draw_square(args, &from_f64(p1), 255 * 255, 3);
     }
   }

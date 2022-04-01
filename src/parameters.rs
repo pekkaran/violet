@@ -24,5 +24,9 @@ pub struct ParameterSet {
   #[clap(long)]
   pub show_pyramid: bool,
   #[clap(long)]
-  pub show_flow: bool,
+  pub show_flow0: bool,
+  #[clap(long)]
+  pub show_flow1: bool,
+  #[clap(long)]
+  pub show_flow2: bool,
 }

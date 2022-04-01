@@ -19,6 +19,13 @@ pub struct OpticalFlow {
   grid0: Matrixd,
 }
 
+#[derive(PartialEq)]
+pub enum OpticalFlowKind {
+  LeftPreviousToCurrent,
+  LeftCurrentToRightCurrent,
+  LeftCurrentToRightCurrentDetection,
+}
+
 impl OpticalFlow {
   pub fn new() -> Result<OpticalFlow> {
     let (lk_iters, lk_levels, lk_win_size) = {
@@ -44,6 +51,7 @@ impl OpticalFlow {
 
   pub fn process(
     &mut self,
+    kind: OpticalFlowKind,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
     features0: &[Vector2d],
@@ -65,7 +73,12 @@ impl OpticalFlow {
 
     let d = &mut DEBUG_DATA.lock().unwrap();
     let p = PARAMETER_SET.lock().unwrap();
-    if p.show_flow {
+    for x in [
+      (p.show_flow0, OpticalFlowKind::LeftPreviousToCurrent),
+      (p.show_flow1, OpticalFlowKind::LeftCurrentToRightCurrent),
+      (p.show_flow2, OpticalFlowKind::LeftCurrentToRightCurrentDetection),
+    ] {
+      if !x.0 || kind != x.1 { continue }
       d.flow.clear();
       for (i, status) in statuses.iter().enumerate() {
         if !status { continue }
