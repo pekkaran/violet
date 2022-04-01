@@ -26,7 +26,12 @@ impl Pyramid {
   // Argument 0 gives size of the original non-down scaled image.
   pub fn size(&self, level: usize) -> [usize; 2] {
     let n = usize::pow(2, level as u32);
-    [self.size[0] / n, self.size[1] / n]
+    let w = self.size[0] / n;
+    let h = self.size[1] / n;
+    if w * n != self.size[0] || h * n != self.size[1] {
+      warn!("Pyramid level size is not exact.");
+    }
+    [w, h]
   }
 }
 
