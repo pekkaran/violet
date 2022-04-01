@@ -1,8 +1,9 @@
 use crate::all::*;
 
-pub const VISUALIZE_FEATURES: bool = true;
+pub const VISUALIZE_FEATURES: bool = false;
 pub const VISUALIZE_MASK: bool = false;
 pub const VISUALIZE_PYRAMID: bool = true;
+pub const VISUALIZE_OPTICAL_FLOW: bool = true;
 
 pub struct VisualizeArgs<'a> {
   pub buffer: &'a mut Vec<u32>,
@@ -26,6 +27,27 @@ fn draw_square(args: &mut VisualizeArgs, p: &Vector2i, v: u32, r: i32) {
     draw_pixel(args, &(p + Vector2i::new(z, r)), v);
     draw_pixel(args, &(p + Vector2i::new(-r, z)), v);
     draw_pixel(args, &(p + Vector2i::new(r, z)), v);
+  }
+}
+
+fn draw_line(args: &mut VisualizeArgs, mut p0: Vector2i, mut p1: Vector2i, v: u32) {
+  let dx = p1[0] - p0[0];
+  let dy = p1[1] - p0[1];
+  if dx.abs() < dy.abs() {
+    if p0[1] > p1[1] { (p0, p1) = (p1, p0); }
+    let k = dx as f32 / dy as f32;
+    for y in p0[1] ..= p1[1] {
+      let x = p0[0] + (k * (y - p0[1]) as f32).round() as i32;
+      draw_pixel(args, &Vector2i::new(x, y), v);
+    }
+  }
+  else {
+    if p0[0] > p1[0] { (p0, p1) = (p1, p0); }
+    let k = dy as f32 / dx as f32;
+    for x in p0[0] ..= p1[0] {
+      let y = p0[1] + (k * (x - p0[0]) as f32).round() as i32;
+      draw_pixel(args, &Vector2i::new(x, y), v);
+    }
   }
 }
 
@@ -73,6 +95,8 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
     for p in &d.detections {
       draw_square(args, p, 255 * 255, 3);
     }
+  }
+  if VISUALIZE_OPTICAL_FLOW {
   }
   Ok(())
 }
