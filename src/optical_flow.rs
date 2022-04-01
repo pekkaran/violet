@@ -21,21 +21,24 @@ pub struct OpticalFlow {
 
 impl OpticalFlow {
   pub fn new() -> Result<OpticalFlow> {
-    let p = &*PARAMETER_SET.lock().unwrap();
-    if p.lk_win_size % 2 != 1 {
+    let (lk_iters, lk_levels, lk_win_size) = {
+      let p = &*PARAMETER_SET.lock().unwrap();
+      (p.lk_iters, p.lk_levels, p.lk_win_size)
+    };
+    if lk_win_size % 2 != 1 {
       bail!("Lucas-Kanade window size must be odd number.");
     }
-    if p.lk_win_size < 3 {
+    if lk_win_size < 3 {
       bail!("Lucas-Kanade window size must be at least 3.");
     }
     Ok(OpticalFlow {
-      lk_iters: p.lk_iters,
-      lk_levels: p.lk_levels,
-      lk_win_size: p.lk_win_size,
-      Ix: DMatrix::zeros(p.lk_win_size, p.lk_win_size),
-      Iy: DMatrix::zeros(p.lk_win_size, p.lk_win_size),
-      It: DMatrix::zeros(p.lk_win_size, p.lk_win_size),
-      grid0: DMatrix::zeros(p.lk_win_size, p.lk_win_size),
+      lk_iters,
+      lk_levels,
+      lk_win_size,
+      Ix: DMatrix::zeros(lk_win_size, lk_win_size),
+      Iy: DMatrix::zeros(lk_win_size, lk_win_size),
+      It: DMatrix::zeros(lk_win_size, lk_win_size),
+      grid0: DMatrix::zeros(lk_win_size, lk_win_size),
     })
   }
 
@@ -48,6 +51,7 @@ impl OpticalFlow {
     statuses: &mut Vec<bool>,
   ) {
     features1.clear();
+    statuses.clear();
     for feature0 in features0 {
       if let Some(feature1) = self.process_feature(frame0, frame1, *feature0) {
         features1.push(feature1);
@@ -56,6 +60,15 @@ impl OpticalFlow {
       else {
         features1.push(*feature0);
         statuses.push(false);
+      }
+    }
+
+    let d = &mut DEBUG_DATA.lock().unwrap();
+    if VISUALIZE_OPTICAL_FLOW {
+      d.flow.clear();
+      for (i, status) in statuses.iter().enumerate() {
+        if !status { continue }
+        d.flow.push((features0[i], features1[i]));
       }
     }
   }

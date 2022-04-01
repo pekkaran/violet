@@ -6,13 +6,21 @@ pub struct Vio {
   // Use private fields to clarify this struct would form the main API.
   tracker: Tracker,
   frames: Vec<Frame>,
+  frame_number: usize,
+  frame_sub: usize,
 }
 
 impl Vio {
   pub fn new() -> Result<Vio> {
+    let frame_sub = {
+      let p = &*PARAMETER_SET.lock().unwrap();
+      p.frame_sub
+    };
     Ok(Vio {
       tracker: Tracker::new()?,
       frames: vec![],
+      frame_number: 0,
+      frame_sub,
     })
   }
 
@@ -20,15 +28,20 @@ impl Vio {
     &self.frames
   }
 
-  pub fn process(&mut self, input_data: &InputData) -> Result<()> {
+  // Returns true if processed a frame.
+  pub fn process(&mut self, input_data: &InputData) -> Result<bool> {
     match input_data.sensor {
       InputDataSensor::Frame(ref frame) => {
-        self.process_frame(frame)?;
+        self.frame_number += 1;
+        if (self.frame_number - 1) % self.frame_sub == 0 {
+          self.process_frame(frame)?;
+          return Ok(true);
+        }
       },
       InputDataSensor::Gyroscope(_) => {},
       InputDataSensor::Accelerometer(_) => {}
     }
-    Ok(())
+    Ok(false)
   }
 
   fn process_frame(&mut self, frame: &InputFrame) -> Result<()> {

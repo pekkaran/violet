@@ -8,4 +8,5 @@ lazy_static! {
 pub struct DebugData {
   pub detections: Vec<Vector2i>,
   pub detection_mask: Vec<bool>,
+  pub flow: Vec<(Vector2d, Vector2d)>,
 }

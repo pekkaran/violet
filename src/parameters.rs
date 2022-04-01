@@ -7,10 +7,12 @@ lazy_static! {
 #[derive(Debug, Default)]
 #[derive(clap::Parser)]
 pub struct ParameterSet {
-  #[clap(default_value = "3")]
+  #[clap(long, default_value = "1")]
+  pub frame_sub: usize,
+  #[clap(long, default_value = "3")]
   pub lk_levels: usize,
-  #[clap(default_value = "5")]
+  #[clap(long, default_value = "5")]
   pub lk_iters: usize,
-  #[clap(default_value = "7")]
+  #[clap(long, default_value = "7")]
   pub lk_win_size: usize,
 }

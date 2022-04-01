@@ -22,19 +22,23 @@ impl Frame {
     let (data, unused_pyramid) = if let Some(mut unused_frame) = unused_frame {
       // Move data buffer from old unused frame to the new frame to avoid allocation.
       unused_frame.data.clear();
-      unused_frame.data.extend(input_frame.video.data.iter());
+      unused_frame.data.extend(input_frame.videos[0].data.iter());
       (unused_frame.data, Some(unused_frame.pyramid))
     }
     else {
-      (input_frame.video.data.clone(), None)
+      (input_frame.videos[0].data.clone(), None)
     };
 
-    let p = &*PARAMETER_SET.lock().unwrap();
+    let lk_levels = {
+      let p = &*PARAMETER_SET.lock().unwrap();
+      p.lk_levels
+    };
+    // TODO Store multiple videos.
     Ok(Frame {
-      pyramid: Pyramid::new(&input_frame.video, unused_pyramid, p.lk_levels)?,
+      pyramid: Pyramid::new(&input_frame.videos[0], unused_pyramid, lk_levels)?,
       data,
-      width: input_frame.video.width,
-      height: input_frame.video.height,
+      width: input_frame.videos[0].width,
+      height: input_frame.videos[0].height,
     })
   }
 

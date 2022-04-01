@@ -16,8 +16,8 @@ pub struct VisualizeArgs<'a> {
 
 #[inline(always)]
 fn draw_pixel(args: &mut VisualizeArgs, p: &Vector2i, v: u32) {
-  if p[0] < 0 || p[0] > args.buffer_w as i32 || p[0] > args.video_w as i32 { return }
-  if p[1] < 0 || p[1] > args.buffer_h as i32 || p[1] > args.video_h as i32 { return }
+  if p[0] < 0 || p[0] >= args.buffer_w as i32 || p[0] >= args.video_w as i32 { return }
+  if p[1] < 0 || p[1] >= args.buffer_h as i32 || p[1] >= args.video_h as i32 { return }
   args.buffer[p[1] as usize * args.buffer_w + p[0] as usize] = v;
 }
 
@@ -97,6 +97,10 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
     }
   }
   if VISUALIZE_OPTICAL_FLOW {
+    for (p0, p1) in &d.flow {
+      draw_line(args, from_f64(p0), from_f64(p1), 255 * 255);
+      draw_square(args, &from_f64(p1), 255 * 255, 3);
+    }
   }
   Ok(())
 }

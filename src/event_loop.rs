@@ -69,14 +69,15 @@ pub fn handle_event(
 
   match args.input.next()? {
     Some(input_data) => {
-      args.vio.process(&input_data)?;
+      let processed_frame = args.vio.process(&input_data)?;
+      if !processed_frame { return Ok(()) }
 
       if let InputDataSensor::Frame(ref frame) = input_data.sensor {
         let mut visualize_args = VisualizeArgs {
           buffer: &mut args.buffer,
           frames: args.vio.get_frames(),
-          video_w: frame.video.width,
-          video_h: frame.video.height,
+          video_w: frame.videos[0].width,
+          video_h: frame.videos[0].height,
           buffer_w: window_width,
           buffer_h: window_height,
         };

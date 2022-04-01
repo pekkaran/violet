@@ -3,12 +3,11 @@ use crate::all::*;
 pub struct Input {
   reader: BufReader<File>,
   line: String,
-  video_input: VideoInput,
+  video_inputs: Vec<VideoInput>,
 }
 
 pub struct InputFrame<'a> {
-  // Maybe a Vec<> here for stereo input?
-  pub video: &'a VideoFrame,
+  pub videos: Vec<&'a VideoFrame>,
 }
 
 pub struct InputData<'a> {
@@ -25,12 +24,14 @@ pub enum InputDataSensor<'a> {
 impl Input {
   pub fn new(path: &Path) -> Result<Input> {
     let file = File::open(path.join("data.jsonl"))?;
-    let video_input = VideoInput::new(&path.join("data.mp4"))
-      .context("Failed to create video input")?;
+    let video_inputs = vec![
+      VideoInput::new(&path.join("data.mp4"))?,
+      VideoInput::new(&path.join("data2.mp4"))?,
+    ];
     Ok(Input {
       reader: BufReader::new(file),
       line: String::new(),
-      video_input,
+      video_inputs,
     })
   }
 
@@ -79,7 +80,9 @@ impl Input {
       }
       else if let Some(_frames) = value.get("frames") {
         let input_frame = InputFrame {
-          video: self.video_input.read()?,
+          videos: self.video_inputs.iter_mut()
+            .map(|x| x.read())
+            .collect::<Result<Vec<_>>>()?,
         };
         return Ok(Some(InputData {
           time,

@@ -10,3 +10,7 @@ pub type Matrix2d = nalgebra::Matrix2::<f64>;
 pub fn from_usize(p: &Vector2usize) -> Vector2i {
   Vector2i::new(p[0] as i32, p[1] as i32)
 }
+
+pub fn from_f64(p: &Vector2d) -> Vector2i {
+  Vector2i::new(p[0].round() as i32, p[1].round() as i32)
+}
