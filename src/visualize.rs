@@ -2,7 +2,7 @@ use crate::all::*;
 
 pub const VISUALIZE_FEATURES: bool = false;
 pub const VISUALIZE_MASK: bool = false;
-pub const VISUALIZE_PYRAMID: bool = true;
+pub const VISUALIZE_PYRAMID: bool = false;
 pub const VISUALIZE_OPTICAL_FLOW: bool = true;
 
 pub struct VisualizeArgs<'a> {
@@ -73,13 +73,16 @@ fn draw_buffer(
 
 pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   let frame = args.frames.iter().last().ok_or(anyhow!("Cannot visualize before processing the first frame."))?;
-  draw_buffer(args, &frame.data, frame.width, frame.height, 0, 0);
+  let fc0 = &frame.cameras[0];
+  let fc1 = &frame.cameras[1];
+  draw_buffer(args, &fc0.data, fc0.width, fc0.height, 0, 0);
+  draw_buffer(args, &fc1.data, fc1.width, fc1.height, fc0.width, 0);
 
   if VISUALIZE_PYRAMID {
     let mut a = [0, 0];
-    for (i, level) in frame.pyramid.levels.iter().enumerate() {
-      a[i % 2] += frame.pyramid.size(i)[i % 2];
-      let size = frame.pyramid.size(i + 1);
+    for (i, level) in fc0.pyramid.levels.iter().enumerate() {
+      a[i % 2] += fc0.pyramid.size(i)[i % 2];
+      let size = fc0.pyramid.size(i + 1);
       draw_buffer(args, level, size[0], size[1], a[0], a[1]);
     }
   }

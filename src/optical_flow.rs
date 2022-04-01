@@ -44,8 +44,8 @@ impl OpticalFlow {
 
   pub fn process(
     &mut self,
-    frame0: &Frame,
-    frame1: &Frame,
+    frame_camera0: &FrameCamera,
+    frame_camera1: &FrameCamera,
     features0: &[Vector2d],
     features1: &mut Vec<Vector2d>,
     statuses: &mut Vec<bool>,
@@ -53,7 +53,7 @@ impl OpticalFlow {
     features1.clear();
     statuses.clear();
     for feature0 in features0 {
-      if let Some(feature1) = self.process_feature(frame0, frame1, *feature0) {
+      if let Some(feature1) = self.process_feature(frame_camera0, frame_camera1, *feature0) {
         features1.push(feature1);
         statuses.push(true);
       }
@@ -76,16 +76,16 @@ impl OpticalFlow {
   #[allow(non_snake_case)]
   fn process_feature(
     &mut self,
-    frame0: &Frame,
-    frame1: &Frame,
+    frame_camera0: &FrameCamera,
+    frame_camera1: &FrameCamera,
     feature0: Vector2d,
   ) -> Option<Vector2d> {
     let r = (self.lk_win_size - 1) / 2;
     let mut g = Vector2d::zeros();
     let mut d = Vector2d::zeros();
     for L in (0..self.lk_levels + 1).rev() {
-      let level0 = frame0.get_level(L);
-      let level1 = frame1.get_level(L);
+      let level0 = frame_camera0.get_level(L);
+      let level1 = frame_camera1.get_level(L);
       let u = feature0 / u32::pow(2, L as u32) as f64;
       let range = integration_range(&level0, u, r, 1)?;
       scharr(&level0, u, range, &mut self.Ix, &mut self.Iy, &mut self.grid0);

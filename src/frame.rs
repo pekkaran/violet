@@ -2,6 +2,10 @@ use crate::all::*;
 
 // Data derived from single frame input to `Vio::process()`.
 pub struct Frame {
+  pub cameras: Vec<FrameCamera>
+}
+
+pub struct FrameCamera {
   pub data: Vec<u8>,
   pub width: usize,
   pub height: usize,
@@ -19,29 +23,39 @@ impl Frame {
     input_frame: &InputFrame,
     unused_frame: Option<Frame>,
   ) -> Result<Frame> {
-    let (data, unused_pyramid) = if let Some(mut unused_frame) = unused_frame {
+    let mut frame = if let Some(mut unused_frame) = unused_frame {
       // Move data buffer from old unused frame to the new frame to avoid allocation.
-      unused_frame.data.clear();
-      unused_frame.data.extend(input_frame.videos[0].data.iter());
-      (unused_frame.data, Some(unused_frame.pyramid))
+      for i in 0..unused_frame.cameras.len() {
+        unused_frame.cameras[i].data.clear();
+      }
+      unused_frame
     }
     else {
-      (input_frame.videos[0].data.clone(), None)
+      let mut cameras = vec![];
+      for video in &input_frame.videos {
+        cameras.push(FrameCamera {
+          pyramid: Pyramid::empty(),
+          data: video.data.clone(),
+          width: video.width,
+          height: video.height,
+        });
+      }
+      Frame { cameras }
     };
 
     let lk_levels = {
       let p = &*PARAMETER_SET.lock().unwrap();
       p.lk_levels
     };
-    // TODO Store multiple videos.
-    Ok(Frame {
-      pyramid: Pyramid::new(&input_frame.videos[0], unused_pyramid, lk_levels)?,
-      data,
-      width: input_frame.videos[0].width,
-      height: input_frame.videos[0].height,
-    })
+    for (i, camera) in frame.cameras.iter_mut().enumerate() {
+      camera.data.extend(input_frame.videos[i].data.iter());
+      Pyramid::compute(&mut camera.pyramid, &input_frame.videos[0], lk_levels)?;
+    }
+    Ok(frame)
   }
+}
 
+impl FrameCamera {
   pub fn get_level(&self, level: usize) -> Level {
     if level == 0 {
       Level {

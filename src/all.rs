@@ -21,6 +21,7 @@ pub use {
   std::{
     fs::File,
     io::{BufRead, BufReader, Read},
+    mem,
     path::{Path, PathBuf},
     sync::Mutex,
   },

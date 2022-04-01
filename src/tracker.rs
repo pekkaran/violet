@@ -32,14 +32,14 @@ impl Tracker {
         .map(|p| Vector2d::new(p[0] as f64, p[1] as f64)));
 
       self.optical_flow.process(
-        frame0,
-        frame1,
+        &frame0.cameras[0],
+        &frame1.cameras[0],
         &self.features0,
         &mut self.features1,
         &mut self.statuses,
       );
     }
 
-    self.detector.process(frame1, &mut self.detections);
+    self.detector.process(&frame1.cameras[0], &mut self.detections);
   }
 }

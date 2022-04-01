@@ -8,19 +8,26 @@ pub struct Pyramid {
 }
 
 impl Pyramid {
-  pub fn new(
+  pub fn empty() -> Pyramid {
+    Pyramid {
+      levels: vec![],
+      size: [0, 0],
+    }
+  }
+
+  pub fn compute(
+    // Unused pyramid or a new one from `Pyramid::empty()`.
+    pyramid: &mut Pyramid,
     video_frame: &VideoFrame,
-    unused_pyramid: Option<Pyramid>,
     level_count: usize,
-  ) -> Result<Pyramid> {
-    Ok(Pyramid {
-      levels: compute_levels(
-        video_frame,
-        unused_pyramid.map(|x| x.levels),
-        level_count,
-      )?,
-      size: [video_frame.width, video_frame.height],
-    })
+  ) -> Result<()> {
+    pyramid.levels = compute_levels(
+      video_frame,
+      mem::take(&mut pyramid.levels),
+      level_count,
+    )?;
+    pyramid.size = [video_frame.width, video_frame.height];
+    Ok(())
   }
 
   // Argument 0 gives size of the original non-down scaled image.
@@ -37,10 +44,12 @@ impl Pyramid {
 
 fn compute_levels(
   video_frame: &VideoFrame,
-  unused_levels: Option<Vec<Vec<u8>>>,
+  mut levels: Vec<Vec<u8>>,
   level_count: usize,
 ) -> Result<Vec<Vec<u8>>> {
-  let mut levels = unused_levels.unwrap_or(vec![vec![]; level_count]);
+  while levels.len() < level_count {
+    levels.push(vec![]);
+  }
   if level_count == 0 { return Ok(levels) }
   let mut width = video_frame.width;
   let mut height = video_frame.height;
