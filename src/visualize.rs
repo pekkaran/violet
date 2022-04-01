@@ -115,8 +115,11 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   else if p.show_flow1 || p.show_flow2 {
     let ax = Vector2d::new(fc0.width as f64, 0.);
     for (p0, p1) in &d.flow {
-      draw_line(args, from_f64(&(p0 + ax)), from_f64(p1), 255 * 255);
-      draw_square(args, &from_f64(p1), 255 * 255, 3);
+      let p1 = p1 + ax;
+      // Could randomize a color for each track.
+      draw_line(args, from_f64(p0), from_f64(&p1), 255 * 255);
+      draw_square(args, &from_f64(p0), 255 * 255, 3);
+      draw_square(args, &from_f64(&p1), 255 * 255, 3);
     }
   }
   Ok(())

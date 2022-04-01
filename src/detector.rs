@@ -11,8 +11,7 @@ const CIRCLE: [[i32; 2]; 16] = [
 ];
 
 pub struct Detector {
-  // TODO move to parameters
-  pub start_threshold: i16,
+  start_threshold: i16,
   mask: Vec<bool>,
 }
 
@@ -28,6 +27,7 @@ impl Detector {
     &mut self,
     frame_camera: &FrameCamera,
     detections: &mut Vec<Vector2d>,
+    needed_features_count: usize,
   ) {
     detections.clear();
     self.mask.clear();
@@ -36,13 +36,17 @@ impl Detector {
     }
     let mut threshold = self.start_threshold;
     let mask_radius = ((frame_camera.width.max(frame_camera.height) as f32) / 100.0).round() as i32;
-    for _ in 0..4 {
+    let threshold_halving_iterations = 4;
+
+    'detection:
+    for _ in 0..threshold_halving_iterations {
       for x in CIRCLE_RADIUS .. (frame_camera.width - CIRCLE_RADIUS) {
         for y in CIRCLE_RADIUS .. (frame_camera.height - CIRCLE_RADIUS) {
           if self.mask[y * frame_camera.width + x] { continue }
           if !self.detect_at_pixel(x as i32, y as i32, frame_camera, threshold) { continue }
           detections.push(Vector2d::new(x as f64, y as f64));
           add_mask(&mut self.mask, x as i32, y as i32, frame_camera.width, frame_camera.height, mask_radius);
+          if detections.len() >= needed_features_count { break 'detection }
         }
       }
       threshold /= 2;

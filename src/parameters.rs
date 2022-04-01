@@ -9,6 +9,12 @@ lazy_static! {
 pub struct ParameterSet {
   #[clap(long, default_value = "1")]
   pub frame_sub: usize,
+
+  // Tracker module.
+  #[clap(long, default_value = "400")]
+  pub max_tracks: usize,
+
+  // Pyramidal Lucas-Kanade feature tracker.
   #[clap(long, default_value = "3")]
   pub lk_levels: usize,
   #[clap(long, default_value = "5")]

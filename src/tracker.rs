@@ -7,10 +7,15 @@ pub struct Tracker {
   features0: Vec<Vector2d>,
   features1: Vec<Vector2d>,
   statuses: Vec<bool>,
+  max_tracks: usize,
 }
 
 impl Tracker {
   pub fn new() -> Result<Tracker> {
+    let max_tracks = {
+      let p = PARAMETER_SET.lock().unwrap();
+      p.max_tracks
+    };
     Ok(Tracker {
       detector: Detector::new(),
       optical_flow: OpticalFlow::new()?,
@@ -18,6 +23,7 @@ impl Tracker {
       features0: vec![],
       features1: vec![],
       statuses: vec![],
+      max_tracks,
     })
   }
 
@@ -48,7 +54,9 @@ impl Tracker {
       remove_failed_tracks(&mut self.features0, &mut self.statuses);
     }
 
-    self.detector.process(&frame1.cameras[0], &mut self.detections);
+    assert!(self.features0.len() <= self.max_tracks);
+    let needed_features_count = self.max_tracks - self.features0.len();
+    self.detector.process(&frame1.cameras[0], &mut self.detections, needed_features_count);
     self.optical_flow.process(
       OpticalFlowKind::LeftCurrentToRightCurrentDetection,
       &frame1.cameras[0],
