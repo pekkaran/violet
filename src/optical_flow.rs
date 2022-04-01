@@ -120,7 +120,7 @@ fn integration_range(
   for i in 0..2 {
     let n = u[i] as i16;
     let s = if i == 0 { frame.width } else { frame.height };
-    range[i] = [i16::max(-r, -n + padding), i16::min(r, s as i16 - n - padding - 2)];
+    range[i] = [i16::max(-r, -n + padding), i16::min(r, s as i16 - n - padding - 1)];
   }
   range
 }
@@ -174,16 +174,98 @@ fn bilinear(frame: &Frame, u: Vector2d) -> f64 {
   let y1 = y0 + 1;
   let xa = u[0].fract();
   let ya = u[1].fract();
-  (1. - xa) * (1. - ya) * frame.data[y0 * frame.width + x0] as f64
-    + xa * (1. - ya) * frame.data[y0 * frame.width + x1] as f64
-    + (1. - xa) * ya * frame.data[y1 * frame.width + x0] as f64
-    + xa * ya * frame.data[y1 * frame.width + x1] as f64
+  let eps = 1e-5;
+  // Besides improving computation speed, these allow to work one pixel
+  // closer to the right and bottom edges when coordinates are integers.
+  if xa < eps && ya < eps {
+    frame.data[y0 * frame.width + x0] as f64
+  }
+  else if xa < eps {
+    (1. - ya) * frame.data[y0 * frame.width + x0] as f64
+      + ya * frame.data[y1 * frame.width + x0] as f64
+  }
+  else if ya < eps {
+    (1. - xa) * frame.data[y0 * frame.width + x0] as f64
+      + xa * frame.data[y0 * frame.width + x1] as f64
+  }
+  else {
+    (1. - xa) * (1. - ya) * frame.data[y0 * frame.width + x0] as f64
+      + xa * (1. - ya) * frame.data[y0 * frame.width + x1] as f64
+      + (1. - xa) * ya * frame.data[y1 * frame.width + x0] as f64
+      + xa * ya * frame.data[y1 * frame.width + x1] as f64
+  }
 }
 
 
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn test_scharr() {
+    let mut frame = Frame {
+      data: vec![
+        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+      ],
+      width: 5,
+      height: 5,
+      pyramid: Pyramid {
+        levels: vec![],
+        size: [5, 5],
+      },
+    };
+
+    let mut out_x = dmatrix!();
+    let mut out_y = dmatrix!();
+    let mut grid = dmatrix!();
+    let center = Vector2d::new(2.0, 2.0);
+    let range = integration_range(&frame, center, 1, 1);
+    scharr(&frame, center, range, &mut out_x, &mut out_y, &mut grid);
+    assert_eq!(out_x, DMatrix::zeros(3, 3));
+    assert_eq!(out_y, DMatrix::zeros(3, 3));
+
+    frame.data = vec![
+      0, 1, 2, 3, 4,
+      0, 1, 2, 3, 4,
+      0, 1, 2, 3, 4,
+      0, 1, 2, 3, 4,
+      0, 1, 2, 3, 4,
+    ];
+    scharr(&frame, center, range, &mut out_x, &mut out_y, &mut grid);
+    assert_eq!(out_x, DMatrix::repeat(3, 3, 1.));
+    assert_eq!(out_y, DMatrix::zeros(3, 3));
+
+    frame.data = vec![
+      0, 1, 2, 3, 4,
+      1, 2, 3, 4, 5,
+      2, 3, 4, 5, 6,
+      3, 4, 5, 6, 7,
+      4, 5, 6, 7, 8,
+    ];
+    scharr(&frame, center, range, &mut out_x, &mut out_y, &mut grid);
+    assert_eq!(out_x, DMatrix::repeat(3, 3, 1.));
+    assert_eq!(out_y, DMatrix::repeat(3, 3, 1.));
+
+    frame.data = vec![
+      0, 0, 5, 0, 0,
+      0, 0, 5, 0, 0,
+      0, 0, 5, 0, 0,
+      0, 0, 5, 0, 0,
+      0, 0, 5, 0, 0,
+    ];
+    scharr(&frame, center, range, &mut out_x, &mut out_y, &mut grid);
+    let answer_x = dmatrix!(
+      2.5, 0., -2.5;
+      2.5, 0., -2.5;
+      2.5, 0., -2.5;
+    );
+    assert_eq!(out_x, answer_x);
+    assert_eq!(out_y, DMatrix::zeros(3, 3));
+  }
 
   #[test]
   fn test_integration_range() {
