@@ -45,11 +45,12 @@ impl Detector {
     }
 
     let d = &mut DEBUG_DATA.lock().unwrap();
-    if VISUALIZE_FEATURES {
+    let p = PARAMETER_SET.lock().unwrap();
+    if p.show_features {
       d.detections.clear();
       d.detections.extend(detections.iter());
     }
-    if VISUALIZE_MASK {
+    if p.show_mask {
       d.detection_mask.clear();
       d.detection_mask.extend(self.mask.iter());
     }

@@ -22,7 +22,7 @@ pub struct OpticalFlow {
 impl OpticalFlow {
   pub fn new() -> Result<OpticalFlow> {
     let (lk_iters, lk_levels, lk_win_size) = {
-      let p = &*PARAMETER_SET.lock().unwrap();
+      let p = PARAMETER_SET.lock().unwrap();
       (p.lk_iters, p.lk_levels, p.lk_win_size)
     };
     if lk_win_size % 2 != 1 {
@@ -64,7 +64,8 @@ impl OpticalFlow {
     }
 
     let d = &mut DEBUG_DATA.lock().unwrap();
-    if VISUALIZE_OPTICAL_FLOW {
+    let p = PARAMETER_SET.lock().unwrap();
+    if p.show_flow {
       d.flow.clear();
       for (i, status) in statuses.iter().enumerate() {
         if !status { continue }

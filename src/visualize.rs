@@ -1,10 +1,5 @@
 use crate::all::*;
 
-pub const VISUALIZE_FEATURES: bool = false;
-pub const VISUALIZE_MASK: bool = false;
-pub const VISUALIZE_PYRAMID: bool = false;
-pub const VISUALIZE_OPTICAL_FLOW: bool = true;
-
 pub struct VisualizeArgs<'a> {
   pub buffer: &'a mut Vec<u32>,
   pub frames: &'a [Frame],
@@ -78,7 +73,8 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   draw_buffer(args, &fc0.data, fc0.width, fc0.height, 0, 0);
   draw_buffer(args, &fc1.data, fc1.width, fc1.height, fc0.width, 0);
 
-  if VISUALIZE_PYRAMID {
+  let p = PARAMETER_SET.lock().unwrap();
+  if p.show_pyramid {
     let mut a = [0, 0];
     for (i, level) in fc0.pyramid.levels.iter().enumerate() {
       a[i % 2] += fc0.pyramid.size(i)[i % 2];
@@ -88,18 +84,18 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   }
 
   let d = DEBUG_DATA.lock().unwrap();
-  if VISUALIZE_MASK {
+  if p.show_mask {
     for i in 0..d.detection_mask.len() {
       if !d.detection_mask[i] { continue }
       draw_pixel(args, &from_usize(&Vector2usize::new(i % args.video_w, i / args.video_w)), 255 * 255 * 255);
     }
   }
-  if VISUALIZE_FEATURES {
+  if p.show_features {
     for p in &d.detections {
       draw_square(args, p, 255 * 255, 3);
     }
   }
-  if VISUALIZE_OPTICAL_FLOW {
+  if p.show_flow {
     for (p0, p1) in &d.flow {
       draw_line(args, from_f64(p0), from_f64(p1), 255 * 255);
       draw_square(args, &from_f64(p1), 255 * 255, 3);

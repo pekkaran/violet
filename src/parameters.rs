@@ -15,4 +15,14 @@ pub struct ParameterSet {
   pub lk_iters: usize,
   #[clap(long, default_value = "7")]
   pub lk_win_size: usize,
+
+  // Visualizations.
+  #[clap(long)]
+  pub show_features: bool,
+  #[clap(long)]
+  pub show_mask: bool,
+  #[clap(long)]
+  pub show_pyramid: bool,
+  #[clap(long)]
+  pub show_flow: bool,
 }

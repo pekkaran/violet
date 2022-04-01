@@ -13,7 +13,7 @@ pub struct Vio {
 impl Vio {
   pub fn new() -> Result<Vio> {
     let frame_sub = {
-      let p = &*PARAMETER_SET.lock().unwrap();
+      let p = PARAMETER_SET.lock().unwrap();
       p.frame_sub
     };
     Ok(Vio {

@@ -44,7 +44,7 @@ impl Frame {
     };
 
     let lk_levels = {
-      let p = &*PARAMETER_SET.lock().unwrap();
+      let p = PARAMETER_SET.lock().unwrap();
       p.lk_levels
     };
     for (i, camera) in frame.cameras.iter_mut().enumerate() {
