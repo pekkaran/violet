@@ -7,7 +7,7 @@ pub struct Input {
 }
 
 pub struct InputFrame<'a> {
-  pub videos: Vec<&'a VideoFrame>,
+  pub images: Vec<&'a Image>,
 }
 
 pub struct InputData<'a> {
@@ -80,7 +80,7 @@ impl Input {
       }
       else if let Some(_frames) = value.get("frames") {
         let input_frame = InputFrame {
-          videos: self.video_inputs.iter_mut()
+          images: self.video_inputs.iter_mut()
             .map(|x| x.read())
             .collect::<Result<Vec<_>>>()?,
         };

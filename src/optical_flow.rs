@@ -123,7 +123,7 @@ fn image_difference(
   r: usize,
   I0: &Matrixd,
   mut It: &mut Matrixd,
-  level: &Level,
+  level: &Image,
   center: Vector2d,
 ) -> Option<()> {
   let range = integration_range(level, center, r, 0)?;
@@ -182,7 +182,7 @@ fn spatial_gradient(
 // the image borders. Returns None if the center point is outside the level
 // boundaries.
 fn integration_range(
-  level: &Level,
+  level: &Image,
   center: Vector2d,
   r: usize,
   padding: i16,
@@ -200,7 +200,7 @@ fn integration_range(
 }
 
 fn fill_grid(
-  level: &Level,
+  level: &Image,
   range: Range,
   center: Vector2d,
   grid: &mut Matrixd,
@@ -214,7 +214,7 @@ fn fill_grid(
 }
 
 fn scharr(
-  level: &Level,
+  level: &Image,
   center: Vector2d,
   range: Range,
   out_x: &mut Matrixd,
@@ -248,7 +248,7 @@ fn scharr(
 }
 
 #[inline(always)]
-fn bilinear(frame: &Level, u: Vector2d) -> f64 {
+fn bilinear(frame: &Image, u: Vector2d) -> f64 {
   assert!(u[0] >= 0.0 && u[0] <= frame.width as f64 - 1.);
   assert!(u[1] >= 0.0 && u[1] <= frame.height as f64 - 1.);
   let x0 = u[0] as usize;

@@ -48,19 +48,18 @@ fn draw_line(args: &mut VisualizeArgs, mut p0: Vector2i, mut p1: Vector2i, v: u3
 
 fn draw_buffer(
   args: &mut VisualizeArgs,
-  // Data to be drawn.
-  data: &[u8],
-  w: usize,
-  h: usize,
+  image: &Image,
   // Top-left coordinates of drawing target.
   ax: usize,
   ay: usize,
 ) {
+  let w = image.width;
+  let h = image.height;
   for y in 0..h {
     if y + ay >= args.buffer_h { continue }
     for x in 0..w {
       if x + ax >= args.buffer_w { continue }
-      let gray = data[y * w + x] as u32;
+      let gray = image.data[y * w + x] as u32;
       args.buffer[(y + ay) * args.buffer_w + x + ax] = gray | (gray << 8) | (gray << 16);
     }
   }
@@ -75,18 +74,17 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   }
 
   let frame = args.frames.iter().last().ok_or(anyhow!("Cannot visualize before processing the first frame."))?;
-  let fc0 = &frame.cameras[0];
-  let fc1 = &frame.cameras[1];
-  draw_buffer(args, &fc0.data, fc0.width, fc0.height, 0, 0);
-  draw_buffer(args, &fc1.data, fc1.width, fc1.height, fc0.width, 0);
+  let im0 = &frame.cameras[0].image;
+  let im1 = &frame.cameras[1].image;
+  draw_buffer(args, &im0, 0, 0);
+  draw_buffer(args, &im1, im0.width, 0);
 
   let p = PARAMETER_SET.lock().unwrap();
   if p.show_pyramid {
     let mut a = [0, 0];
-    for (i, level) in fc0.pyramid.levels.iter().enumerate() {
-      a[i % 2] += fc0.pyramid.size(i)[i % 2];
-      let size = fc0.pyramid.size(i + 1);
-      draw_buffer(args, level, size[0], size[1], a[0], a[1]);
+    for (i, level) in frame.cameras[0].pyramid.levels.iter().enumerate() {
+      a[i % 2] += level.size(i % 2);
+      draw_buffer(args, &level, a[0], a[1]);
     }
   }
 
@@ -113,7 +111,7 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
     }
   }
   else if p.show_flow1 || p.show_flow2 {
-    let ax = Vector2d::new(fc0.width as f64, 0.);
+    let ax = Vector2d::new(im0.width as f64, 0.);
     for (p0, p1) in &d.flow {
       let p1 = p1 + ax;
       // Could randomize a color for each track.

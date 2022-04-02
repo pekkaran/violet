@@ -6,16 +6,8 @@ pub struct Frame {
 }
 
 pub struct FrameCamera {
-  pub data: Vec<u8>,
-  pub width: usize,
-  pub height: usize,
+  pub image: Image,
   pub pyramid: Pyramid,
-}
-
-pub struct Level<'a> {
-  pub data: &'a[u8],
-  pub width: usize,
-  pub height: usize,
 }
 
 impl Frame {
@@ -26,18 +18,16 @@ impl Frame {
     let mut frame = if let Some(mut unused_frame) = unused_frame {
       // Move data buffer from old unused frame to the new frame to avoid allocation.
       for i in 0..unused_frame.cameras.len() {
-        unused_frame.cameras[i].data.clear();
+        unused_frame.cameras[i].image.clear();
       }
       unused_frame
     }
     else {
       let mut cameras = vec![];
-      for video in &input_frame.videos {
+      for image in &input_frame.images {
         cameras.push(FrameCamera {
+          image: (*image).clone(),
           pyramid: Pyramid::empty(),
-          data: video.data.clone(),
-          width: video.width,
-          height: video.height,
         });
       }
       Frame { cameras }
@@ -48,29 +38,22 @@ impl Frame {
       p.lk_levels
     };
     for (i, camera) in frame.cameras.iter_mut().enumerate() {
-      camera.data.extend(input_frame.videos[i].data.iter());
-      Pyramid::compute(&mut camera.pyramid, &input_frame.videos[0], lk_levels)?;
+      camera.image.data.extend(input_frame.images[i].data.iter());
+      camera.image.width = input_frame.images[i].width;
+      camera.image.height = input_frame.images[i].height;
+      Pyramid::compute(&mut camera.pyramid, &input_frame.images[0], lk_levels)?;
     }
     Ok(frame)
   }
 }
 
 impl FrameCamera {
-  pub fn get_level(&self, level: usize) -> Level {
+  pub fn get_level(&self, level: usize) -> &Image {
     if level == 0 {
-      Level {
-        data: &self.data,
-        width: self.width,
-        height: self.height,
-      }
+      &self.image
     }
     else {
-      let size = self.pyramid.size(level);
-      Level {
-        data: &self.pyramid.levels[level - 1],
-        width: size[0],
-        height: size[1],
-      }
+      &self.pyramid.levels[level - 1]
     }
   }
 }

@@ -25,27 +25,29 @@ impl Detector {
 
   pub fn process(
     &mut self,
-    frame_camera: &FrameCamera,
+    image: &Image,
     detections: &mut Vec<Vector2d>,
     needed_features_count: usize,
   ) {
+    assert!(image.width > 1 + 2 * CIRCLE_RADIUS);
+    assert!(image.height > 1 + 2 * CIRCLE_RADIUS);
     detections.clear();
     self.mask.clear();
-    for _ in 0 .. (frame_camera.width * frame_camera.height) {
+    for _ in 0 .. (image.width * image.height) {
       self.mask.push(false);
     }
     let mut threshold = self.start_threshold;
-    let mask_radius = ((frame_camera.width.max(frame_camera.height) as f32) / 100.0).round() as i32;
+    let mask_radius = ((image.width.max(image.height) as f32) / 100.0).round() as i32;
     let threshold_halving_iterations = 4;
 
     'detection:
     for _ in 0..threshold_halving_iterations {
-      for x in CIRCLE_RADIUS .. (frame_camera.width - CIRCLE_RADIUS) {
-        for y in CIRCLE_RADIUS .. (frame_camera.height - CIRCLE_RADIUS) {
-          if self.mask[y * frame_camera.width + x] { continue }
-          if !self.detect_at_pixel(x as i32, y as i32, frame_camera, threshold) { continue }
+      for x in CIRCLE_RADIUS .. (image.width - CIRCLE_RADIUS) {
+        for y in CIRCLE_RADIUS .. (image.height - CIRCLE_RADIUS) {
+          if self.mask[y * image.width + x] { continue }
+          if !self.detect_at_pixel(x as i32, y as i32, image, threshold) { continue }
           detections.push(Vector2d::new(x as f64, y as f64));
-          add_mask(&mut self.mask, x as i32, y as i32, frame_camera.width, frame_camera.height, mask_radius);
+          add_mask(&mut self.mask, x as i32, y as i32, image.width, image.height, mask_radius);
           if detections.len() >= needed_features_count { break 'detection }
         }
       }
@@ -68,25 +70,24 @@ impl Detector {
     &mut self,
     x: i32,
     y: i32,
-    frame_camera: &FrameCamera,
+    image: &Image,
     threshold: i16,
   ) -> bool {
-    let center_value = value(x, y, frame_camera);
-    if continuous(x, y, frame_camera, |v| v < center_value - threshold) { return true }
-    if continuous(x, y, frame_camera, |v| v > center_value + threshold) { return true }
+    let center_value = image.value_i32(x, y) as i16;
+    if continuous(x, y, image, |v| (v as i16) < center_value - threshold) { return true }
+    if continuous(x, y, image, |v| (v as i16) > center_value + threshold) { return true }
     false
   }
 }
 
-fn continuous<F: Fn(i16) -> bool>(x: i32, y: i32, frame_camera: &FrameCamera, f: F) -> bool {
+fn continuous<F: Fn(u8) -> bool>(x: i32, y: i32, image: &Image, f: F) -> bool {
   // Quick rejection for 9 and 12 variants.
-  if !f(value(x + 3, y, frame_camera)) && !f(value(x - 3, y, frame_camera)) { return false }
+  if !f(image.value_i32(x + 3, y)) && !f(image.value_i32(x - 3, y)) { return false }
 
   let it = CircleIterator::new(x, y);
   let mut n = 0;
   for p in it {
-    let v = value(p[0], p[1], frame_camera);
-    if f(v) {
+    if f(image.value_i32(p[0], p[1])) {
       n += 1;
       if n >= FAST_VARIANT_N { return true }
     }
@@ -123,11 +124,6 @@ impl Iterator for CircleIterator {
       self.center[1] + CIRCLE[self.ind - 1][1],
     ])
   }
-}
-
-#[inline(always)]
-fn value(x: i32, y: i32, frame_camera: &FrameCamera) -> i16 {
-  frame_camera.data[y as usize * frame_camera.width + x as usize] as i16
 }
 
 fn add_mask(

@@ -76,8 +76,8 @@ pub fn handle_event(
         let mut visualize_args = VisualizeArgs {
           buffer: &mut args.buffer,
           frames: args.vio.get_frames(),
-          video_w: frame.videos[0].width,
-          video_h: frame.videos[0].height,
+          video_w: frame.images[0].width,
+          video_h: frame.images[0].height,
           buffer_w: window_width,
           buffer_h: window_height,
         };

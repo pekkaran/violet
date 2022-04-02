@@ -1,9 +1,10 @@
 mod all;
 mod debug;
 mod detector;
-mod frame;
-mod input;
 mod event_loop;
+mod frame;
+mod image;
+mod input;
 mod optical_flow;
 mod parameters;
 mod pyramid;

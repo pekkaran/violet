@@ -3,7 +3,8 @@ use crate::all::*;
 const NAIVE_DOWNSCALE: bool = false;
 
 pub struct Pyramid {
-  pub levels: Vec<Vec<u8>>,
+  pub levels: Vec<Image>,
+  // Size of the parent Image. Needed?
   pub size: [usize; 2],
 }
 
@@ -18,7 +19,7 @@ impl Pyramid {
   pub fn compute(
     // Unused pyramid or a new one from `Pyramid::empty()`.
     pyramid: &mut Pyramid,
-    video_frame: &VideoFrame,
+    video_frame: &Image,
     level_count: usize,
   ) -> Result<()> {
     pyramid.levels = compute_levels(
@@ -29,68 +30,50 @@ impl Pyramid {
     pyramid.size = [video_frame.width, video_frame.height];
     Ok(())
   }
-
-  // Argument 0 gives size of the original non-down scaled image.
-  pub fn size(&self, level: usize) -> [usize; 2] {
-    let n = usize::pow(2, level as u32);
-    let w = self.size[0] / n;
-    let h = self.size[1] / n;
-    if w * n != self.size[0] || h * n != self.size[1] {
-      warn!("Pyramid level size is not exact.");
-    }
-    [w, h]
-  }
 }
 
 fn compute_levels(
-  video_frame: &VideoFrame,
-  mut levels: Vec<Vec<u8>>,
+  video_frame: &Image,
+  mut levels: Vec<Image>,
   level_count: usize,
-) -> Result<Vec<Vec<u8>>> {
+) -> Result<Vec<Image>> {
   while levels.len() < level_count {
-    levels.push(vec![]);
+    levels.push(Image::empty());
   }
   if level_count == 0 { return Ok(levels) }
-  let mut width = video_frame.width;
-  let mut height = video_frame.height;
-  downscale(&video_frame.data, &mut levels[0], width, height)?;
-  width /= 2;
-  height /= 2;
+  downscale(&video_frame, &mut levels[0])?;
   for i in 0..(level_count - 1) {
     let rest = &mut levels[i..];
     // Need to use a split function to get a mutable and non-mutable reference
     // to different elements of the vector.
     if let Some((parent, rest)) = rest.split_first_mut() {
-      downscale(&parent, &mut rest[0], width, height)?;
-      width /= 2;
-      height /= 2;
+      downscale(&parent, &mut rest[0])?;
     }
   }
   Ok(levels)
 }
 
 fn downscale(
-  parent: &[u8],
-  child: &mut Vec<u8>,
-  w: usize,
-  h: usize,
+  parent: &Image,
+  child: &mut Image
 ) -> Result<()> {
-  assert_eq!(parent.len(), w * h);
+  let w = parent.width as i32;
+  let h = parent.height as i32;
   if w % 2 != 0 || h % 2 != 0 {
     bail!("Cannot downscale image with dimensions {}x{}", w, h);
   }
-  let w = w as i32;
-  let h = h as i32;
   let w2 = w / 2;
   let h2 = h / 2;
-  child.clear();
+  child.data.clear();
+  child.width = w2 as usize;
+  child.height = h2 as usize;
 
   let v = |mut x: i32, mut y: i32| -> u16 {
     if x < 0 { x = 0 }
     if y < 0 { y = 0 }
     if x >= w { x = w }
     if y >= h { y = h }
-    parent[((y * w) + x) as usize] as u16
+    parent.data[((y * w) + x) as usize] as u16
   };
 
   for y in 0..h2 {
@@ -106,7 +89,7 @@ fn downscale(
           + (v(x2 + 1, y2) + v(x2 - 1, y2) + v(x2, y2 + 1) + v(x2, y2 - 1)) / 8
           + (v(x2 + 1, y2 + 1) + v(x2 - 1, y2 - 1) + v(x2 - 1, y2 + 1) + v(x2 + 1, y2 - 1)) / 16
       };
-      child.push(value as u8);
+      child.data.push(value as u8);
     }
   }
   Ok(())

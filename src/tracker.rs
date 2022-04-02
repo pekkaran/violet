@@ -56,7 +56,7 @@ impl Tracker {
 
     assert!(self.features0.len() <= self.max_tracks);
     let needed_features_count = self.max_tracks - self.features0.len();
-    self.detector.process(&frame1.cameras[0], &mut self.detections, needed_features_count);
+    self.detector.process(&frame1.cameras[0].image, &mut self.detections, needed_features_count);
     self.optical_flow.process(
       OpticalFlowKind::LeftCurrentToRightCurrentDetection,
       &frame1.cameras[0],

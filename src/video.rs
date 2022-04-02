@@ -4,13 +4,7 @@ use std::process::{ChildStdout, Command, Stdio};
 
 pub struct VideoInput {
   child_stdout: ChildStdout,
-  video_frame: VideoFrame,
-}
-
-pub struct VideoFrame {
-  pub data: Vec<u8>,
-  pub width: usize,
-  pub height: usize,
+  video_frame: Image,
 }
 
 impl VideoInput {
@@ -36,7 +30,7 @@ impl VideoInput {
       .spawn()?;
     Ok(VideoInput {
       child_stdout: child.stdout.unwrap(),
-      video_frame: VideoFrame {
+      video_frame: Image {
         data: vec![],
         width: resolution[0],
         height: resolution[1],
@@ -44,7 +38,7 @@ impl VideoInput {
     })
   }
 
-  pub fn read(&mut self) -> Result<&VideoFrame> {
+  pub fn read(&mut self) -> Result<&Image> {
     let n = self.video_frame.width * self.video_frame.height;
     if self.video_frame.data.len() != n {
       self.video_frame.data.resize(n, 0);

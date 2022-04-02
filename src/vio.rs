@@ -32,6 +32,8 @@ impl Vio {
   pub fn process(&mut self, input_data: &InputData) -> Result<bool> {
     match input_data.sensor {
       InputDataSensor::Frame(ref frame) => {
+        assert!(frame.images[0].width > 0 && frame.images[0].height > 0);
+        assert!(frame.images[1].width > 0 && frame.images[1].height > 0);
         self.frame_number += 1;
         if (self.frame_number - 1) % self.frame_sub == 0 {
           self.process_frame(frame)?;
