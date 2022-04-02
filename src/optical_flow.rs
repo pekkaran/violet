@@ -12,6 +12,8 @@ pub struct OpticalFlow {
   lk_iters: usize,
   lk_levels: usize,
   lk_win_size: usize,
+  lk_term: f64,
+  lk_min_eig: f64,
   Ix: Matrixd,
   Iy: Matrixd,
   It: Matrixd,
@@ -28,17 +30,19 @@ pub enum OpticalFlowKind {
 
 impl OpticalFlow {
   pub fn new() -> Result<OpticalFlow> {
-    let (lk_iters, lk_levels, lk_win_size) = {
+    let (lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig) = {
       let p = PARAMETER_SET.lock().unwrap();
-      (p.lk_iters, p.lk_levels, p.lk_win_size)
+      (p.lk_iters, p.lk_levels, p.lk_win_size, p.lk_term, p.lk_min_eig)
     };
-    Self::new_custom(lk_iters, lk_levels, lk_win_size)
+    Self::new_custom(lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig)
   }
 
   pub fn new_custom(
     lk_iters: usize,
     lk_levels: usize,
     lk_win_size: usize,
+    lk_term: f64,
+    lk_min_eig: f64,
   ) -> Result<OpticalFlow> {
     if lk_win_size % 2 != 1 {
       bail!("Lucas-Kanade window size must be odd number.");
@@ -50,6 +54,8 @@ impl OpticalFlow {
       lk_iters,
       lk_levels,
       lk_win_size,
+      lk_term,
+      lk_min_eig,
       Ix: DMatrix::zeros(lk_win_size, lk_win_size),
       Iy: DMatrix::zeros(lk_win_size, lk_win_size),
       It: DMatrix::zeros(lk_win_size, lk_win_size),
@@ -92,9 +98,10 @@ impl OpticalFlow {
     frame_camera1: &FrameCamera,
     feature0: Feature,
   ) -> Option<Feature> {
+    let term2 = self.lk_term * self.lk_term;
     let r = (self.lk_win_size - 1) / 2;
     let mut g = Vector2d::zeros();
-    let mut d = Vector2d::zeros();
+    let mut nu = Vector2d::zeros();
     for L in (0..self.lk_levels + 1).rev() {
       let level0 = frame_camera0.get_level(L);
       let level1 = frame_camera1.get_level(L);
@@ -102,17 +109,23 @@ impl OpticalFlow {
       let range = integration_range(&level0, u, r, 1)?;
       scharr(&level0, u, range, &mut self.Ix, &mut self.Iy, &mut self.grid0);
       let G = spatial_gradient(range, &self.Ix, &self.Iy);
-      let mut nu = Vector2d::zeros();
+      if G.eigenvalues()?.min() < self.lk_min_eig { return None }
       for _ in 0..self.lk_iters {
         image_difference(range, r, &self.grid0, &mut self.It, &level1, u + g + nu)?;
-        nu += flow_vector(&G, &self.Ix, &self.Iy, &self.It)?;
-        // if nu < self.lk_term { break }
+        let eta = flow_vector(&G, &self.Ix, &self.Iy, &self.It)?;
+        // TODO This heuristic is dubious. Maybe the real problem is elsewhere.
+        if eta.norm_squared() > 10. { return None; }
+        nu += eta;
+        if eta.norm_squared() < term2 { break }
       }
-      d = nu;
-      if L > 0 { g = 2. * (g + d) }
+      if L > 0 { g = 2. * (g + nu) }
+    }
+    // Verify match.
+    if self.It.component_mul(&self.It).sum() / (self.It.nrows() * self.It.ncols()) as f64 > 1000. {
+      return None;
     }
     Some(Feature {
-      point: feature0.point + g + d,
+      point: feature0.point + g + nu,
       id: feature0.id,
     })
   }
@@ -153,6 +166,7 @@ fn flow_vector(
       b[1] += It[(y, x)] * Iy[(y, x)];
     }
   }
+
   // Could instead solve the linear equation?
   G.try_inverse().map(|invG| invG * b)
 }

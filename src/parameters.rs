@@ -17,10 +17,14 @@ pub struct ParameterSet {
   // Pyramidal Lucas-Kanade feature tracker.
   #[clap(long, default_value = "3")]
   pub lk_levels: usize,
-  #[clap(long, default_value = "5")]
+  #[clap(long, default_value = "10")]
   pub lk_iters: usize,
   #[clap(long, default_value = "7")]
   pub lk_win_size: usize,
+  #[clap(long, default_value = "0.1")]
+  pub lk_term: f64,
+  #[clap(long, default_value = "1e-4")]
+  pub lk_min_eig: f64,
 
   // Visualizations.
   #[clap(long)]

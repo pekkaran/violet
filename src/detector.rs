@@ -18,7 +18,7 @@ pub struct Detector {
 impl Detector {
   pub fn new() -> Detector {
     Detector {
-      start_threshold: 64,
+      start_threshold: 128,
       mask: vec![],
     }
   }
