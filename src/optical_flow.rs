@@ -74,7 +74,6 @@ impl OpticalFlow {
     features1.clear();
     for feature0 in features0 {
       if let Some(feature1) = self.process_feature(
-        kind,
         frame_camera0,
         frame_camera1,
         *feature0,
@@ -99,7 +98,6 @@ impl OpticalFlow {
   #[allow(non_snake_case)]
   fn process_feature(
     &mut self,
-    kind: OpticalFlowKind,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
     feature0: Feature,
@@ -116,23 +114,26 @@ impl OpticalFlow {
       scharr(&level0, u, range, &mut self.Ix, &mut self.Iy, &mut self.grid0);
       let G = spatial_gradient(range, &self.Ix, &self.Iy);
       if G.eigenvalues()?.min() < self.lk_min_eig { return None }
+      let mut converged = false;
       for _ in 0..self.lk_iters {
         image_difference(range, r, &self.grid0, &mut self.It, &level1, u + g + nu)?;
         let eta = flow_vector(&G, &self.Ix, &self.Iy, &self.It)?;
-        // TODO This heuristic is dubious. Maybe the real problem is elsewhere.
-        if eta.norm_squared() > 10. { return None; }
         nu += eta;
-        if eta.norm_squared() < term2 { break }
+        if eta.norm_squared() < term2 {
+          converged = true;
+          break;
+        }
       }
+      if !converged { return None }
       if L > 0 { g = 2. * (g + nu) }
     }
     // Verify match in the one-camera tracking where distortions are expected to
     // be smaller.
-    if kind == OpticalFlowKind::LeftPreviousToCurrent {
-      if self.It.component_mul(&self.It).sum() / (self.It.nrows() * self.It.ncols()) as f64 > 1000. {
-        return None;
-      }
-    }
+    // if kind == OpticalFlowKind::LeftPreviousToCurrent {
+    //   if self.It.component_mul(&self.It).sum() / (self.It.nrows() * self.It.ncols()) as f64 > 1000. {
+    //     return None;
+    //   }
+    // }
     Some(Feature {
       point: feature0.point + g + nu,
       id: feature0.id,
