@@ -54,7 +54,7 @@ fn run() -> Result<()> {
 
   let input_folder_path = Path::new(&args.input_folder);
   let mut input = Input::new(&input_folder_path)?;
-  let camera_setups = CameraSetup::load(&input_folder_path)
+  let cameras = Camera::load(&input_folder_path)
     .context("Could not load camera setups.")?;
 
   let width = 1920;
@@ -81,7 +81,7 @@ fn run() -> Result<()> {
     input: &mut input,
     buffer: &mut buffer,
     graphics_context: &mut graphics_context,
-    vio: Vio::new(camera_setups)?,
+    vio: Vio::new(cameras)?,
     step_mode: false,
     advance: false,
   };

@@ -2,24 +2,25 @@ use crate::all::*;
 
 const MAX_FRAMES_IN_MEMORY: usize = 2;
 
+#[allow(dead_code)]
 pub struct Vio {
   // Use private fields to clarify this struct would form the main API.
   tracker: Tracker,
-  camera_setups: Vec<CameraSetup>,
+  cameras: Vec<Camera>,
   frames: Vec<Frame>,
   frame_number: usize,
   frame_sub: usize,
 }
 
 impl Vio {
-  pub fn new(camera_setups: Vec<CameraSetup>) -> Result<Vio> {
+  pub fn new(cameras: Vec<Camera>) -> Result<Vio> {
     let frame_sub = {
       let p = PARAMETER_SET.lock().unwrap();
       p.frame_sub
     };
     Ok(Vio {
       tracker: Tracker::new()?,
-      camera_setups,
+      cameras,
       frames: vec![],
       frame_number: 0,
       frame_sub,

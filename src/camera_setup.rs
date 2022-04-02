@@ -1,18 +1,8 @@
 use crate::all::*;
 
-// Intrinsic and extrinsic camera parameters for a single camera.
-#[derive(Debug)]
-pub struct CameraSetup {
-  // Camera matrix.
-  pub K: Matrix3d,
-  pub distortionCoefficients: Vec<f64>,
-  pub imu_to_camera: Matrix4d,
-  pub kind: CameraKind,
-}
-
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
-pub struct DCameraSetup {
+pub struct CameraSetup {
   pub focalLengthX: f64,
   pub focalLengthY: f64,
   pub principalPointX: f64,
@@ -27,49 +17,51 @@ pub struct DCameraSetup {
 }
 
 #[derive(Deserialize)]
-pub struct DCameraSetupRoot {
-  pub cameras: Vec<DCameraSetup>,
+pub struct CameraSetupRoot {
+  pub cameras: Vec<CameraSetup>,
 }
 
 const MAX_PARENT_DIRECTORY_HEIGHT: usize = 1;
 const SETUP_FILE_NAME: &'static str = "calibration.json";
 
-impl CameraSetup {
-  pub fn load(path: &Path) -> Result<Vec<CameraSetup>> {
+impl Camera {
+  pub fn load(path: &Path) -> Result<Vec<Camera>> {
     let path = path.to_path_buf();
     for _ in 0..(MAX_PARENT_DIRECTORY_HEIGHT + 1) {
       let setup_path = path.join(SETUP_FILE_NAME);
       if setup_path.exists() {
-        let x = parse_setup(&setup_path)?;
-        dbg!(x);
-        break;
+        return parse_setup(&setup_path);
       }
     }
     bail!("Failed to find a {}.", SETUP_FILE_NAME);
   }
 }
 
-fn parse_setup(path: &Path) -> Result<Vec<CameraSetup>> {
+fn parse_setup(path: &Path) -> Result<Vec<Camera>> {
   let s = std::fs::read_to_string(path)
     .context(format!("Failed to read file {}.", path.display()))?;
-  let root: DCameraSetupRoot = serde_json::from_str(&s)
+  let root: CameraSetupRoot = serde_json::from_str(&s)
     .context(format!("Failed to parse {}.", path.display()))?;
   root.cameras.into_iter()
     .map(|x| convert_setup(x))
     .collect::<Result<Vec<_>>>()
 }
 
-fn convert_setup(d: DCameraSetup) -> Result<CameraSetup> {
-
-  Ok(CameraSetup {
-    K: Matrix3d::new(
-         d.focalLengthX, 0., d.principalPointX,
-         0., d.focalLengthY, d.principalPointY,
-         0., 0., 1.
-    ),
-    distortionCoefficients: d.distortionCoefficients,
-    kind: convert_model(&d.model)?,
+fn convert_setup(d: CameraSetup) -> Result<Camera> {
+  let camera_matrix = Matrix3d::new(
+    d.focalLengthX, 0., d.principalPointX,
+    0., d.focalLengthY, d.principalPointY,
+    0., 0., 1.
+  );
+  let kind = convert_model(&d.model)?;
+  let model = match kind {
+    CameraKind::Pinhole => Box::new(PinholeModel::new(camera_matrix, d.distortionCoefficients)),
+    CameraKind::KannalaBrandt4 => unimplemented!(),
+  };
+  Ok(Camera {
+    kind,
     imu_to_camera: Matrix4d::from_iterator(d.imuToCamera.into_iter().flatten()),
+    model,
   })
 }
 
