@@ -1,6 +1,8 @@
 // NOTE This kind of import-all file isn't a common Rust idiom.
 
 pub use crate::{
+  camera::*,
+  camera_setup::*,
   debug::*,
   detector::*,
   event_loop::*,
@@ -29,7 +31,8 @@ pub use {
     path::{Path, PathBuf},
     sync::Mutex,
   },
+  anyhow::{anyhow, bail, Context as AnyhowContext, Result},
   log::{debug, error, info, warn, LevelFilter},
   nalgebra::{dmatrix, dvector, DMatrix},
-  anyhow::{anyhow, bail, Context as AnyhowContext, Result},
+  serde::Deserialize,
 };

@@ -5,19 +5,21 @@ const MAX_FRAMES_IN_MEMORY: usize = 2;
 pub struct Vio {
   // Use private fields to clarify this struct would form the main API.
   tracker: Tracker,
+  camera_setups: Vec<CameraSetup>,
   frames: Vec<Frame>,
   frame_number: usize,
   frame_sub: usize,
 }
 
 impl Vio {
-  pub fn new() -> Result<Vio> {
+  pub fn new(camera_setups: Vec<CameraSetup>) -> Result<Vio> {
     let frame_sub = {
       let p = PARAMETER_SET.lock().unwrap();
       p.frame_sub
     };
     Ok(Vio {
       tracker: Tracker::new()?,
+      camera_setups,
       frames: vec![],
       frame_number: 0,
       frame_sub,
