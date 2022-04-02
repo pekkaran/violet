@@ -6,7 +6,7 @@ lazy_static! {
 
 #[derive(Default)]
 pub struct DebugData {
-  pub detections: Vec<Vector2d>,
+  pub detections: Vec<Feature>,
   pub detection_mask: Vec<bool>,
-  pub flow: Vec<(Vector2d, Vector2d)>,
+  pub flow: Vec<Feature>,
 }

@@ -41,10 +41,12 @@ impl Image {
   }
 
   #[inline(always)]
+  #[cfg(test)]
   pub fn set_value(&mut self, x: usize, y: usize, value: u8) {
     self.data[y * self.width + x] = value;
   }
 
+  #[cfg(test)]
   pub fn set_sub_image(&mut self, ax: usize, ay: usize, image: &Image) {
     for y in 0..image.height {
       for x in 0..image.width {
@@ -53,10 +55,12 @@ impl Image {
     }
   }
 
+  #[cfg(test)]
   pub fn set_sub_image_i32(&mut self, ax: i32, ay: i32, image: &Image) {
     self.set_sub_image(ax as usize, ay as usize, image)
   }
 
+  #[cfg(test)]
   pub fn get_sub_image(
     &self,
     ax: usize,

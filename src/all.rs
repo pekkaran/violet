@@ -10,6 +10,7 @@ pub use crate::{
   optical_flow::*,
   parameters::*,
   pyramid::*,
+  track::*,
   tracker::*,
   types::*,
   util::*,

@@ -26,12 +26,14 @@ impl Detector {
   pub fn process(
     &mut self,
     image: &Image,
-    detections: &mut Vec<Vector2d>,
+    detections: &mut Vec<Feature>,
     needed_features_count: usize,
+    next_id: &mut TrackId,
   ) {
     assert!(image.width > 1 + 2 * CIRCLE_RADIUS);
     assert!(image.height > 1 + 2 * CIRCLE_RADIUS);
     detections.clear();
+    if needed_features_count == 0 { return }
     self.mask.clear();
     for _ in 0 .. (image.width * image.height) {
       self.mask.push(false);
@@ -46,7 +48,11 @@ impl Detector {
         for y in CIRCLE_RADIUS .. (image.height - CIRCLE_RADIUS) {
           if self.mask[y * image.width + x] { continue }
           if !self.detect_at_pixel(x as i32, y as i32, image, threshold) { continue }
-          detections.push(Vector2d::new(x as f64, y as f64));
+          detections.push(Feature {
+            point: Vector2d::new(x as f64, y as f64),
+            id: *next_id,
+          });
+          next_id.0 += 1;
           add_mask(&mut self.mask, x as i32, y as i32, image.width, image.height, mask_radius);
           if detections.len() >= needed_features_count { break 'detection }
         }

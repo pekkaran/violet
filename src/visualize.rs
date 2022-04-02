@@ -25,6 +25,7 @@ fn draw_square(args: &mut VisualizeArgs, p: &Vector2i, v: u32, r: i32) {
   }
 }
 
+#[allow(dead_code)]
 fn draw_line(args: &mut VisualizeArgs, mut p0: Vector2i, mut p1: Vector2i, v: u32) {
   let dx = p1[0] - p0[0];
   let dy = p1[1] - p0[1];
@@ -96,14 +97,16 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
     }
   }
   if p.show_features {
-    for p in &d.detections {
-      draw_square(args, &from_f64(p), 255 * 255, 3);
+    for feature in &d.detections {
+      draw_square(args, &from_f64(&feature.point), 255 * 255, 3);
     }
   }
 
   if [p.show_flow0, p.show_flow1, p.show_flow2].iter().map(|x| *x as usize).sum::<usize>() > 1 {
     warn!("Only one optical flow visualization is supported at a time.");
   }
+  // TODO Use ids to look up previous coordinates.
+  /*
   if p.show_flow0 {
     for (p0, p1) in &d.flow {
       draw_line(args, from_f64(p0), from_f64(p1), 255 * 255);
@@ -121,5 +124,6 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
       draw_square(args, &from_f64(&(p0 + ax)), 255 * 255 * 255, 3);
     }
   }
+  */
   Ok(())
 }

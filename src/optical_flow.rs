@@ -62,20 +62,13 @@ impl OpticalFlow {
     kind: OpticalFlowKind,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
-    features0: &[Vector2d],
-    features1: &mut Vec<Vector2d>,
-    statuses: &mut Vec<bool>,
+    features0: &[Feature],
+    features1: &mut Vec<Feature>,
   ) {
     features1.clear();
-    statuses.clear();
     for feature0 in features0 {
       if let Some(feature1) = self.process_feature(frame_camera0, frame_camera1, *feature0) {
         features1.push(feature1);
-        statuses.push(true);
-      }
-      else {
-        features1.push(*feature0);
-        statuses.push(false);
       }
     }
 
@@ -88,10 +81,7 @@ impl OpticalFlow {
     ] {
       if !x.0 || kind != x.1 { continue }
       d.flow.clear();
-      for (i, status) in statuses.iter().enumerate() {
-        if !status { continue }
-        d.flow.push((features0[i], features1[i]));
-      }
+      d.flow.extend(features1.iter());
     }
   }
 
@@ -100,15 +90,15 @@ impl OpticalFlow {
     &mut self,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
-    feature0: Vector2d,
-  ) -> Option<Vector2d> {
+    feature0: Feature,
+  ) -> Option<Feature> {
     let r = (self.lk_win_size - 1) / 2;
     let mut g = Vector2d::zeros();
     let mut d = Vector2d::zeros();
     for L in (0..self.lk_levels + 1).rev() {
       let level0 = frame_camera0.get_level(L);
       let level1 = frame_camera1.get_level(L);
-      let u = feature0 / u32::pow(2, L as u32) as f64;
+      let u = feature0.point / u32::pow(2, L as u32) as f64;
       let range = integration_range(&level0, u, r, 1)?;
       scharr(&level0, u, range, &mut self.Ix, &mut self.Iy, &mut self.grid0);
       let G = spatial_gradient(range, &self.Ix, &self.Iy);
@@ -121,7 +111,10 @@ impl OpticalFlow {
       d = nu;
       if L > 0 { g = 2. * (g + d) }
     }
-    Some(feature0 + g + d)
+    Some(Feature {
+      point: feature0.point + g + d,
+      id: feature0.id,
+    })
   }
 }
 

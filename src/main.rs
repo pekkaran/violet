@@ -8,6 +8,7 @@ mod input;
 mod optical_flow;
 mod parameters;
 mod pyramid;
+mod track;
 mod tracker;
 mod types;
 mod util;
