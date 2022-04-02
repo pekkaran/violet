@@ -118,6 +118,7 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
       draw_line(args, from_f64(p0), from_f64(&p1), 255 * 255);
       draw_square(args, &from_f64(p0), 255 * 255, 3);
       draw_square(args, &from_f64(&p1), 255 * 255, 3);
+      draw_square(args, &from_f64(&(p0 + ax)), 255 * 255 * 255, 3);
     }
   }
   Ok(())

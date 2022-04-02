@@ -20,6 +20,7 @@ pub use crate::{
 
 pub use {
   std::{
+    fmt,
     fs::File,
     io::{BufRead, BufReader, Read},
     mem,

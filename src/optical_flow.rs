@@ -32,6 +32,14 @@ impl OpticalFlow {
       let p = PARAMETER_SET.lock().unwrap();
       (p.lk_iters, p.lk_levels, p.lk_win_size)
     };
+    Self::new_custom(lk_iters, lk_levels, lk_win_size)
+  }
+
+  pub fn new_custom(
+    lk_iters: usize,
+    lk_levels: usize,
+    lk_win_size: usize,
+  ) -> Result<OpticalFlow> {
     if lk_win_size % 2 != 1 {
       bail!("Lucas-Kanade window size must be odd number.");
     }
@@ -283,34 +291,71 @@ fn bilinear(frame: &Image, u: Vector2d) -> f64 {
 mod tests {
   use super::*;
 
-  fn make_camera(data: Vec<u8>, width: usize, height: usize) -> FrameCamera {
-    let mut video = VideoFrame {
-      data,
-      width,
-      height,
-    };
+  fn make_camera(image: Image, lk_levels: usize) -> FrameCamera {
     let mut pyramid = Pyramid::empty();
-    let lk_levels = 1;
-    Pyramid::compute(&mut pyramid, &video, lk_levels).unwrap();
+    Pyramid::compute(&mut pyramid, &image, lk_levels).unwrap();
     FrameCamera {
-      data: video.data.clone(),
-      width: video.width,
-      height: video.height,
+      image,
       pyramid,
     }
   }
 
-  // #[test]
-  // fn test_flow() {
-  //   let width = 16;
-  //   let height = 16;
-  //   let data = DMatrix::zeros(height, width);
-  //   let camera = make_camera(data.as_vec(), width, height);
-  // }
+  #[test]
+  fn test_flow() {
+    // Use a quite large image to avoid issues at the borders.
+    let mut image0 = Image {
+      data: vec![0; 128 * 128],
+      width: 128,
+      height: 128,
+    };
+    let mut image1 = image0.clone();
+
+    let patch = Image {
+      data: vec![
+        44, 44, 44, 44, 44, 44, 44, 44, 44,
+        44, 55, 55, 55, 55, 55, 55, 55, 44,
+        44, 55, 77, 77, 77, 77, 77, 55, 44,
+        44, 55, 77, 88, 88, 88, 77, 55, 44,
+        44, 55, 77, 88, 99, 88, 77, 55, 44,
+        44, 55, 77, 88, 88, 88, 77, 55, 44,
+        44, 55, 77, 77, 77, 77, 77, 55, 44,
+        44, 55, 55, 55, 55, 55, 55, 55, 44,
+        44, 44, 44, 44, 44, 44, 44, 44, 44,
+      ],
+      width: 9,
+      height: 9,
+    };
+
+    // Place the patch at different positions in the two images.
+    let x: i32 = 60;
+    let y: i32 = 60;
+    let dx: i32 = -14;
+    let dy: i32 = 7;
+    image0.set_sub_image_i32(x, y, &patch);
+    image1.set_sub_image_i32(x + dx, y + dy, &patch);
+
+    let lk_levels = 3;
+    let lk_iters = 5;
+    let lk_win_size = 7;
+
+    let camera0 = make_camera(image0, lk_levels);
+    let camera1 = make_camera(image1, lk_levels);
+
+    // Place feature at center of the first patch.
+    let r = (patch.width - 1) as i32 / 2;
+    let feature0 = Vector2d::new((x + r) as f64, (y + r) as f64);
+    let mut flow = OpticalFlow::new_custom(lk_iters, lk_levels, lk_win_size).unwrap();
+    if let Some(feature1) = flow.process_feature(&camera0, &camera1, feature0) {
+      // The found feature should be near center of the second patch.
+      let err = (feature1 - feature0) - Vector2d::new(dx as f64, dy as f64);
+      dbg!(err.norm());
+      // dbg!(feature1, err);
+    }
+  }
 
   #[test]
   fn test_scharr() {
-    let mut frame = FrameCamera {
+    let mut image = Image {
       data: vec![
         0, 0, 0, 0, 0,
         0, 0, 0, 0, 0,
@@ -320,55 +365,46 @@ mod tests {
       ],
       width: 5,
       height: 5,
-      pyramid: Pyramid {
-        levels: vec![],
-        size: [5, 5],
-      },
     };
-    let level = frame.get_level(0);
-
     let mut out_x = dmatrix!();
     let mut out_y = dmatrix!();
     let mut grid = dmatrix!();
     let center = Vector2d::new(2.0, 2.0);
-    let range = integration_range(&level, center, 1, 1).unwrap();
-    scharr(&level, center, range, &mut out_x, &mut out_y, &mut grid);
+    let range = integration_range(&image, center, 1, 1).unwrap();
+    scharr(&image, center, range, &mut out_x, &mut out_y, &mut grid);
     assert_eq!(out_x, DMatrix::zeros(3, 3));
     assert_eq!(out_y, DMatrix::zeros(3, 3));
 
-    frame.data = vec![
+    image.data = vec![
       0, 1, 2, 3, 4,
       0, 1, 2, 3, 4,
       0, 1, 2, 3, 4,
       0, 1, 2, 3, 4,
       0, 1, 2, 3, 4,
     ];
-    let level = frame.get_level(0);
-    scharr(&level, center, range, &mut out_x, &mut out_y, &mut grid);
+    scharr(&image, center, range, &mut out_x, &mut out_y, &mut grid);
     assert_eq!(out_x, DMatrix::repeat(3, 3, 1.));
     assert_eq!(out_y, DMatrix::zeros(3, 3));
 
-    frame.data = vec![
+    image.data = vec![
       0, 1, 2, 3, 4,
       1, 2, 3, 4, 5,
       2, 3, 4, 5, 6,
       3, 4, 5, 6, 7,
       4, 5, 6, 7, 8,
     ];
-    let level = frame.get_level(0);
-    scharr(&level, center, range, &mut out_x, &mut out_y, &mut grid);
+    scharr(&image, center, range, &mut out_x, &mut out_y, &mut grid);
     assert_eq!(out_x, DMatrix::repeat(3, 3, 1.));
     assert_eq!(out_y, DMatrix::repeat(3, 3, 1.));
 
-    frame.data = vec![
+    image.data = vec![
       0, 0, 5, 0, 0,
       0, 0, 5, 0, 0,
       0, 0, 5, 0, 0,
       0, 0, 5, 0, 0,
       0, 0, 5, 0, 0,
     ];
-    let level = frame.get_level(0);
-    scharr(&level, center, range, &mut out_x, &mut out_y, &mut grid);
+    scharr(&image, center, range, &mut out_x, &mut out_y, &mut grid);
     let answer_x = dmatrix!(
       2.5, 0., -2.5;
       2.5, 0., -2.5;
@@ -383,22 +419,17 @@ mod tests {
     // Width and height are pixels. Coordinate (0, 0) means center of top-left
     // pixel. Thus (9, 9) is the center of the bottom-right pixel for 10x10
     // image.
-    let frame = FrameCamera {
+    let image = Image {
       data: vec![],
       width: 10,
       height: 10,
-      pyramid: Pyramid {
-        levels: vec![],
-        size: [10, 10],
-      },
     };
-    let level = frame.get_level(0);
-    assert_eq!(integration_range(&level, Vector2d::new(4.5, 4.5), 3, 0).unwrap(), [[-3, 3], [-3, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(1.5, 2.5), 3, 0).unwrap(), [[-1, 3], [-2, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(1.0, 2.0), 3, 0).unwrap(), [[-1, 3], [-2, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(0.9, 1.9), 3, 0).unwrap(), [[0, 3], [-1, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(0.9, 1.9), 3, 1).unwrap(), [[1, 3], [0, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(8.5, 2.0), 3, 0).unwrap(), [[-3, 0], [-2, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(9.5, 2.0), 3, 0), None);
+    assert_eq!(integration_range(&image, Vector2d::new(4.5, 4.5), 3, 0).unwrap(), [[-3, 3], [-3, 3]]);
+    assert_eq!(integration_range(&image, Vector2d::new(1.5, 2.5), 3, 0).unwrap(), [[-1, 3], [-2, 3]]);
+    assert_eq!(integration_range(&image, Vector2d::new(1.0, 2.0), 3, 0).unwrap(), [[-1, 3], [-2, 3]]);
+    assert_eq!(integration_range(&image, Vector2d::new(0.9, 1.9), 3, 0).unwrap(), [[0, 3], [-1, 3]]);
+    assert_eq!(integration_range(&image, Vector2d::new(0.9, 1.9), 3, 1).unwrap(), [[1, 3], [0, 3]]);
+    assert_eq!(integration_range(&image, Vector2d::new(8.5, 2.0), 3, 0).unwrap(), [[-3, 0], [-2, 3]]);
+    assert_eq!(integration_range(&image, Vector2d::new(9.5, 2.0), 3, 0), None);
   }
 }
