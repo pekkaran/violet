@@ -6,6 +6,7 @@ pub struct Tracker {
   features0: Vec<Feature>,
   features1: Vec<Feature>,
   features2: Vec<Feature>,
+  tracks: Vec<Track>,
   max_tracks: usize,
   next_id: TrackId,
 }
@@ -22,6 +23,7 @@ impl Tracker {
       features0: vec![],
       features1: vec![],
       features2: vec![],
+      tracks: vec![],
       max_tracks,
       next_id: TrackId(0),
     })
@@ -48,6 +50,7 @@ impl Tracker {
         &self.features1,
         &mut self.features0,
       );
+      update_tracks(&mut self.tracks, &self.features0, &self.features1, false);
     }
 
     assert!(self.features0.len() <= self.max_tracks);
@@ -67,5 +70,32 @@ impl Tracker {
       &mut self.features2,
     );
     self.features0.extend(self.features2.iter());
+    update_tracks(&mut self.tracks, &self.features1, &self.features2, true);
   }
+}
+
+fn update_tracks(
+  tracks: &mut Vec<Track>,
+  features0: &[Feature],
+  features1: &[Feature],
+  new_track: bool,
+) {
+  for feature0 in features0 {
+    for feature1 in features1 {
+      if feature1.id == feature0.id {
+        if new_track {
+          tracks.push(Track::new(*feature0, *feature1));
+        }
+        else {
+          for track in tracks.iter_mut() {
+            if track.id == feature0.id {
+              track.points.push([feature0.point, feature1.point]);
+            }
+          }
+        }
+        break;
+      }
+    }
+  }
+  // TODO Remove non-current tracks.
 }
