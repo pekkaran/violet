@@ -17,7 +17,7 @@ pub struct ParameterSet {
   // Pyramidal Lucas-Kanade feature tracker.
   #[clap(long, default_value = "3")]
   pub lk_levels: usize,
-  #[clap(long, default_value = "10")]
+  #[clap(long, default_value = "5")]
   pub lk_iters: usize,
   #[clap(long, default_value = "7")]
   pub lk_win_size: usize,
@@ -29,6 +29,8 @@ pub struct ParameterSet {
   pub show_mask: bool,
   #[clap(long)]
   pub show_pyramid: bool,
+  #[clap(long)]
+  pub show_tracks: bool,
   #[clap(long)]
   pub show_flow0: bool,
   #[clap(long)]

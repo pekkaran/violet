@@ -96,9 +96,28 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
       draw_pixel(args, &from_usize(&Vector2usize::new(i % args.video_w, i / args.video_w)), 255 * 255 * 255);
     }
   }
+
   if p.show_features {
     for feature in &d.detections {
       draw_square(args, &from_f64(&feature.point), 255 * 255, 3);
+    }
+  }
+
+  if p.show_tracks {
+    let blue = 0;
+    for track in &d.tracks {
+      for i in 1..track.points.len() {
+        let length = 10;
+        if i >= length { continue }
+        let n = track.points.len() - i;
+        let red = 255 * (length - i) / length;
+        let green = 255 * i / length;
+        let color = blue | ((green as u32) << 8) | ((red as u32) << 16);
+        if i == 1 {
+          draw_square(args, &from_f64(&track.points[n][0]), color, 3);
+        }
+        draw_line(args, from_f64(&track.points[n - 1][0]), from_f64(&track.points[n][0]), color);
+      }
     }
   }
 
