@@ -58,6 +58,10 @@ impl Tracker {
       update_tracks(&mut self.tracks, &self.features0, &self.features1, false, self.step);
     }
 
+    // TODO Make this adaptive.
+    let min_distance = 5.0;
+    sparsify_tracks(&mut self.tracks, min_distance);
+
     assert!(self.features0.len() <= self.max_tracks);
     let needed_features_count = self.max_tracks - self.features0.len();
 
@@ -107,20 +111,53 @@ fn update_tracks(
     }
   }
 
-  if new_tracks {
-    let mut i = 0;
-    while i < tracks.len() {
-      if tracks[i].last_seen.0 == step.0 {
-        i += 1;
-        continue;
+  let mut i = 0;
+  while i < tracks.len() {
+    if tracks[i].last_seen.0 == step.0 {
+      i += 1;
+      continue;
+    }
+    tracks.swap_remove(i);
+  }
+  let d = &mut DEBUG_DATA.lock().unwrap();
+  let p = PARAMETER_SET.lock().unwrap();
+  if p.show_tracks {
+    d.tracks.clear();
+    d.tracks.extend(tracks.iter().cloned());
+  }
+}
+
+fn sparsify_tracks(
+  tracks: &mut Vec<Track>,
+  min_distance: f64,
+) {
+  let d2 = min_distance.powi(2);
+  for i0 in 0..tracks.len() {
+    for i1 in (i0 + 1)..tracks.len() {
+      if tracks[i0].points.is_empty() { continue }
+      if tracks[i1].points.is_empty() { continue }
+      let p0 = tracks[i0].points.iter().last().unwrap();
+      let p1 = tracks[i1].points.iter().last().unwrap();
+      for k in 0..2 {
+        if (p0[k] - p1[k]).norm_squared() < d2 {
+          assert_eq!(tracks[i0].last_seen, tracks[i1].last_seen);
+          if tracks[i0].points.len() < tracks[i1].points.len() {
+            tracks[i0].points.clear();
+          }
+          else {
+            tracks[i1].points.clear();
+          }
+          break;
+        }
       }
-      tracks.swap_remove(i);
     }
-    let d = &mut DEBUG_DATA.lock().unwrap();
-    let p = PARAMETER_SET.lock().unwrap();
-    if p.show_tracks {
-      d.tracks.clear();
-      d.tracks.extend(tracks.iter().cloned());
+  }
+  let mut i = 0;
+  while i < tracks.len() {
+    if !tracks[i].points.is_empty() {
+      i += 1;
+      continue;
     }
+    tracks.swap_remove(i);
   }
 }

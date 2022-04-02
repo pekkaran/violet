@@ -21,7 +21,7 @@ pub struct OpticalFlow {
   grid0: Matrixd,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OpticalFlowKind {
   LeftPreviousToCurrent,
   LeftCurrentToRightCurrent,
@@ -73,7 +73,12 @@ impl OpticalFlow {
   ) {
     features1.clear();
     for feature0 in features0 {
-      if let Some(feature1) = self.process_feature(frame_camera0, frame_camera1, *feature0) {
+      if let Some(feature1) = self.process_feature(
+        kind,
+        frame_camera0,
+        frame_camera1,
+        *feature0,
+      ) {
         features1.push(feature1);
       }
     }
@@ -94,11 +99,12 @@ impl OpticalFlow {
   #[allow(non_snake_case)]
   fn process_feature(
     &mut self,
+    kind: OpticalFlowKind,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
     feature0: Feature,
   ) -> Option<Feature> {
-    let term2 = self.lk_term * self.lk_term;
+    let term2 = self.lk_term.powi(2);
     let r = (self.lk_win_size - 1) / 2;
     let mut g = Vector2d::zeros();
     let mut nu = Vector2d::zeros();
@@ -120,9 +126,12 @@ impl OpticalFlow {
       }
       if L > 0 { g = 2. * (g + nu) }
     }
-    // Verify match.
-    if self.It.component_mul(&self.It).sum() / (self.It.nrows() * self.It.ncols()) as f64 > 1000. {
-      return None;
+    // Verify match in the one-camera tracking where distortions are expected to
+    // be smaller.
+    if kind == OpticalFlowKind::LeftPreviousToCurrent {
+      if self.It.component_mul(&self.It).sum() / (self.It.nrows() * self.It.ncols()) as f64 > 1000. {
+        return None;
+      }
     }
     Some(Feature {
       point: feature0.point + g + nu,

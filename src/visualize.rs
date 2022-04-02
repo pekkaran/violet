@@ -107,7 +107,7 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
     let blue = 0;
     for track in &d.tracks {
       for i in 1..track.points.len() {
-        let length = 10;
+        let length = 20;
         if i >= length { continue }
         let n = track.points.len() - i;
         let red = 255 * (length - i) / length;
