@@ -193,8 +193,8 @@ fn integration_range(
     let s = if i == 0 { level.width } else { level.height };
     if center[i] < 0. || center[i] > (s - 1) as f64 { return None; }
     let n = center[i] as i16;
-    // Should check if the -2 is really correct.
-    range[i] = [i16::max(-r, -n + padding), i16::min(r, s as i16 - n - padding - 2)];
+    let fract = if center[i].fract() > 0. { 1 } else { 0 };
+    range[i] = [i16::max(-r, -n + padding), i16::min(r, s as i16 - n - padding - 1 - fract)];
   }
   Some(range)
 }
@@ -283,9 +283,34 @@ fn bilinear(frame: &Level, u: Vector2d) -> f64 {
 mod tests {
   use super::*;
 
+  fn make_camera(data: Vec<u8>, width: usize, height: usize) -> FrameCamera {
+    let mut video = VideoFrame {
+      data,
+      width,
+      height,
+    };
+    let mut pyramid = Pyramid::empty();
+    let lk_levels = 1;
+    Pyramid::compute(&mut pyramid, &video, lk_levels).unwrap();
+    FrameCamera {
+      data: video.data.clone(),
+      width: video.width,
+      height: video.height,
+      pyramid,
+    }
+  }
+
+  // #[test]
+  // fn test_flow() {
+  //   let width = 16;
+  //   let height = 16;
+  //   let data = DMatrix::zeros(height, width);
+  //   let camera = make_camera(data.as_vec(), width, height);
+  // }
+
   #[test]
   fn test_scharr() {
-    let mut frame = Frame {
+    let mut frame = FrameCamera {
       data: vec![
         0, 0, 0, 0, 0,
         0, 0, 0, 0, 0,
@@ -353,18 +378,12 @@ mod tests {
     assert_eq!(out_y, DMatrix::zeros(3, 3));
   }
 
-  // #[test]
-  // fn quick() {
-  //   assert_eq!(5.4 as i32, 5);
-  //   assert_eq!(-2.4_f32.floor(), 5.0);
-  // }
-
   #[test]
   fn test_integration_range() {
     // Width and height are pixels. Coordinate (0, 0) means center of top-left
     // pixel. Thus (9, 9) is the center of the bottom-right pixel for 10x10
     // image.
-    let frame = Frame {
+    let frame = FrameCamera {
       data: vec![],
       width: 10,
       height: 10,
@@ -380,8 +399,6 @@ mod tests {
     assert_eq!(integration_range(&level, Vector2d::new(0.9, 1.9), 3, 0).unwrap(), [[0, 3], [-1, 3]]);
     assert_eq!(integration_range(&level, Vector2d::new(0.9, 1.9), 3, 1).unwrap(), [[1, 3], [0, 3]]);
     assert_eq!(integration_range(&level, Vector2d::new(8.5, 2.0), 3, 0).unwrap(), [[-3, 0], [-2, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(9.5, 2.0), 3, 0).unwrap(), [[-3, -1], [-2, 3]]);
-    assert_eq!(integration_range(&level, Vector2d::new(9.5, 8.5), 3, 0).unwrap(), [[-3, -1], [-3, 0]]);
-    assert_eq!(integration_range(&level, Vector2d::new(9.5, 8.5), 3, 1).unwrap(), [[-3, -2], [-3, -1]]);
+    assert_eq!(integration_range(&level, Vector2d::new(9.5, 2.0), 3, 0), None);
   }
 }
