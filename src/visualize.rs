@@ -10,18 +10,18 @@ pub struct VisualizeArgs<'a> {
 }
 
 #[inline(always)]
-fn draw_pixel(args: &mut VisualizeArgs, p: &Vector2i, v: u32) {
+fn draw_pixel(args: &mut VisualizeArgs, p: Vector2i, v: u32) {
   if p[0] < 0 || p[0] >= args.buffer_w as i32 { return }
   if p[1] < 0 || p[1] >= args.buffer_h as i32 { return }
   args.buffer[p[1] as usize * args.buffer_w + p[0] as usize] = v;
 }
 
-fn draw_square(args: &mut VisualizeArgs, p: &Vector2i, v: u32, r: i32) {
+fn draw_square(args: &mut VisualizeArgs, p: Vector2i, v: u32, r: i32) {
   for z in (-r)..(r+1) {
-    draw_pixel(args, &(p + Vector2i::new(z, -r)), v);
-    draw_pixel(args, &(p + Vector2i::new(z, r)), v);
-    draw_pixel(args, &(p + Vector2i::new(-r, z)), v);
-    draw_pixel(args, &(p + Vector2i::new(r, z)), v);
+    draw_pixel(args, p + Vector2i::new(z, -r), v);
+    draw_pixel(args, p + Vector2i::new(z, r), v);
+    draw_pixel(args, p + Vector2i::new(-r, z), v);
+    draw_pixel(args, p + Vector2i::new(r, z), v);
   }
 }
 
@@ -34,7 +34,7 @@ fn draw_line(args: &mut VisualizeArgs, mut p0: Vector2i, mut p1: Vector2i, v: u3
     let k = dx as f32 / dy as f32;
     for y in p0[1] ..= p1[1] {
       let x = p0[0] + (k * (y - p0[1]) as f32).round() as i32;
-      draw_pixel(args, &Vector2i::new(x, y), v);
+      draw_pixel(args, Vector2i::new(x, y), v);
     }
   }
   else {
@@ -42,7 +42,7 @@ fn draw_line(args: &mut VisualizeArgs, mut p0: Vector2i, mut p1: Vector2i, v: u3
     let k = dy as f32 / dx as f32;
     for x in p0[0] ..= p1[0] {
       let y = p0[1] + (k * (x - p0[0]) as f32).round() as i32;
-      draw_pixel(args, &Vector2i::new(x, y), v);
+      draw_pixel(args, Vector2i::new(x, y), v);
     }
   }
 }
@@ -93,16 +93,18 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   if p.show_mask {
     for i in 0..d.detection_mask.len() {
       if !d.detection_mask[i] { continue }
-      draw_pixel(args, &from_usize(&Vector2usize::new(i % args.video_w, i / args.video_w)), 255 * 255 * 255);
+      draw_pixel(args, from_usize(&Vector2usize::new(i % args.video_w, i / args.video_w)), 255 * 255 * 255);
     }
   }
 
   if p.show_features {
     for feature in &d.detections {
-      draw_square(args, &from_f64(&feature.point), 255 * 255, 3);
+      draw_square(args, from_f64(&feature.point), 255 * 255, 3);
     }
   }
 
+
+  let a = [ Vector2i::new(0, 0), Vector2i::new(args.video_w as i32, 0) ];
   if p.show_tracks {
     let blue = 0;
     for track in &d.tracks {
@@ -113,10 +115,12 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
         let red = 255 * (length - i) / length;
         let green = 255 * i / length;
         let color = blue | ((green as u32) << 8) | ((red as u32) << 16);
-        if i == 1 {
-          draw_square(args, &from_f64(&track.points[n][0]), color, 3);
+        for k in 0..2 {
+          if i == 1 {
+            draw_square(args, &from_f64(&track.points[n][k]) + a[k], color, 3);
+          }
+          draw_line(args, from_f64(&track.points[n - 1][k]) + a[k], from_f64(&track.points[n][k]) + a[k], color);
         }
-        draw_line(args, from_f64(&track.points[n - 1][0]), from_f64(&track.points[n][0]), color);
       }
     }
   }
