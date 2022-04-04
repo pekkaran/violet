@@ -15,32 +15,11 @@ pub enum CameraKind {
 
 pub trait CameraModel {
   fn pixel_to_ray(&self, pixel: Vector2d) -> Option<Vector3d>;
-  fn ray_to_pixel(&self, ray: Vector3d) -> Option<Vector2d>;
-}
 
-pub struct PinholeModel {
-  pub camera_matrix: Matrix3d,
-  pub distortion_coefficients: Vec<f64>,
-}
+  fn ray_to_pixel_d(&self, ray: Vector3d, compute_derivative: bool)
+    -> (Option<Vector2d>, Option<Matrix23d>);
 
-impl PinholeModel {
-  pub fn new(
-    camera_matrix: Matrix3d,
-    distortion_coefficients: Vec<f64>,
-  ) -> PinholeModel {
-    PinholeModel {
-      camera_matrix,
-      distortion_coefficients,
-    }
-  }
-}
-
-impl CameraModel for PinholeModel {
-  fn pixel_to_ray(&self, _pixel: Vector2d) -> Option<Vector3d> {
-    unimplemented!();
-  }
-
-  fn ray_to_pixel(&self, _ray: Vector3d) -> Option<Vector2d> {
-    unimplemented!();
+  fn ray_to_pixel(&self, ray: Vector3d) -> Option<Vector2d> {
+    self.ray_to_pixel_d(ray, false).0
   }
 }

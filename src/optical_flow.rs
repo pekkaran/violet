@@ -357,17 +357,22 @@ mod tests {
     let lk_levels = 3;
     let lk_iters = 5;
     let lk_win_size = 7;
+    let lk_term = 0.1;
+    let lk_min_eig = 1e-4;
 
     let camera0 = make_camera(image0, lk_levels);
     let camera1 = make_camera(image1, lk_levels);
 
     // Place feature at center of the first patch.
     let r = (patch.width - 1) as i32 / 2;
-    let feature0 = Vector2d::new((x + r) as f64, (y + r) as f64);
-    let mut flow = OpticalFlow::new_custom(lk_iters, lk_levels, lk_win_size).unwrap();
+    let feature0 = Feature {
+      point: Vector2d::new((x + r) as f64, (y + r) as f64),
+      id: TrackId(0),
+    };
+    let mut flow = OpticalFlow::new_custom(lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig).unwrap();
     if let Some(feature1) = flow.process_feature(&camera0, &camera1, feature0) {
       // The found feature should be near center of the second patch.
-      let err = (feature1 - feature0) - Vector2d::new(dx as f64, dy as f64);
+      let err = (feature1.point - feature0.point) - Vector2d::new(dx as f64, dy as f64);
       dbg!(err.norm());
       // dbg!(feature1, err);
     }

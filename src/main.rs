@@ -1,5 +1,6 @@
 mod all;
 mod camera;
+mod camera_pinhole;
 mod camera_setup;
 mod debug;
 mod detector;

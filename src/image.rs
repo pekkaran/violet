@@ -61,6 +61,7 @@ impl Image {
   }
 
   #[cfg(test)]
+  #[allow(dead_code)]
   pub fn get_sub_image(
     &self,
     ax: usize,

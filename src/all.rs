@@ -2,6 +2,7 @@
 
 pub use crate::{
   camera::*,
+  camera_pinhole::*,
   camera_setup::*,
   debug::*,
   detector::*,
@@ -33,6 +34,6 @@ pub use {
   },
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
   log::{debug, error, info, warn, LevelFilter},
-  nalgebra::{dmatrix, dvector, DMatrix},
+  nalgebra::{dmatrix, dvector, DMatrix, matrix},
   serde::Deserialize,
 };
