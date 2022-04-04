@@ -1,7 +1,8 @@
 use crate::all::*;
 
 // Values 9 and 12 are popular, allowing quick rejection logic.
-const FAST_VARIANT_N: usize = 9;
+// const FAST_VARIANT_N: usize = 9;
+const FAST_VARIANT_N: usize = 12;
 
 // A Bresenham circle.
 const CIRCLE_RADIUS: usize = 3;
@@ -87,8 +88,12 @@ impl Detector {
 }
 
 fn continuous<F: Fn(u8) -> bool>(x: i32, y: i32, image: &Image, f: F) -> bool {
-  // Quick rejection for 9 and 12 variants.
-  if !f(image.value_i32(x + 3, y)) && !f(image.value_i32(x - 3, y)) { return false }
+  // There are also other quick rejection schemes depending on the threshold.
+  if FAST_VARIANT_N >= 9
+    && !f(image.value_i32(x + 3, y)) && !f(image.value_i32(x - 3, y)
+  ) {
+      return false
+  }
 
   let it = CircleIterator::new(x, y);
   let mut n = 0;
