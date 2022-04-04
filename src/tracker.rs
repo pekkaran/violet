@@ -55,7 +55,7 @@ impl Tracker {
         &self.features1,
         &mut self.features0,
       );
-      update_tracks(&mut self.tracks, &self.features0, &self.features1, false, self.step);
+      update_tracks(&mut self.tracks, &self.features1, &self.features0, false, self.step);
     }
 
     // TODO Make this adaptive.

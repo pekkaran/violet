@@ -72,6 +72,7 @@ impl OpticalFlow {
     features1: &mut Vec<Feature>,
   ) {
     features1.clear();
+    let mut features0_debug = vec![]; // TODO Avoid unecessary allocations.
     for feature0 in features0 {
       if let Some(feature1) = self.process_feature(
         frame_camera0,
@@ -79,6 +80,7 @@ impl OpticalFlow {
         *feature0,
       ) {
         features1.push(feature1);
+        features0_debug.push(*feature0);
       }
     }
 
@@ -90,8 +92,9 @@ impl OpticalFlow {
       (p.show_flow2, OpticalFlowKind::LeftCurrentToRightCurrentDetection),
     ] {
       if !x.0 || kind != x.1 { continue }
-      d.flow.clear();
-      d.flow.extend(features1.iter());
+      d.flow0 = mem::take(&mut features0_debug);
+      d.flow1.clear();
+      d.flow1.extend(features1.iter());
     }
   }
 

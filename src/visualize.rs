@@ -118,6 +118,10 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
         for k in 0..2 {
           if i == 1 {
             draw_square(args, &from_f64(&track.points[n][k]) + a[k], color, 3);
+            // TODO remove
+            if k == 1 {
+              draw_square(args, &from_f64(&track.points[n][0]) + a[k], 255, 3);
+            }
           }
           draw_line(args, from_f64(&track.points[n - 1][k]) + a[k], from_f64(&track.points[n][k]) + a[k], color);
         }
@@ -136,17 +140,18 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
       draw_square(args, &from_f64(p1), 255 * 255, 3);
     }
   }
-  else if p.show_flow1 || p.show_flow2 {
+  */
+  if p.show_flow1 || p.show_flow2 {
     let ax = Vector2d::new(im0.width as f64, 0.);
-    for (p0, p1) in &d.flow {
-      let p1 = p1 + ax;
+    for (f0, f1) in d.flow0.iter().zip(d.flow1.iter()) {
+      let p0 = f0.point;
+      let p1 = f1.point + ax;
       // Could randomize a color for each track.
-      draw_line(args, from_f64(p0), from_f64(&p1), 255 * 255);
-      draw_square(args, &from_f64(p0), 255 * 255, 3);
-      draw_square(args, &from_f64(&p1), 255 * 255, 3);
-      draw_square(args, &from_f64(&(p0 + ax)), 255 * 255 * 255, 3);
+      draw_line(args, from_f64(&p0), from_f64(&p1), 255 * 255);
+      draw_square(args, from_f64(&p0), 255 * 255, 3);
+      draw_square(args, from_f64(&p1), 255 * 255, 3);
+      draw_square(args, from_f64(&(p0 + ax)), 255 * 255 * 255, 3);
     }
   }
-  */
   Ok(())
 }
