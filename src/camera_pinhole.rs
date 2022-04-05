@@ -5,8 +5,7 @@
 
 use crate::all::*;
 
-// const UNDISTORT_MAX_ITERATIONS: usize = 100;
-const UNDISTORT_MAX_ITERATIONS: usize = 5;
+const UNDISTORT_MAX_ITERATIONS: usize = 20;
 const UNDISTORT_CONVERGENCE_THRESHOLD: f64 = 1e-5;
 
 pub struct PinholeModel {
@@ -55,8 +54,7 @@ impl PinholeModel {
     let mut point = dist;
     for _ in 0..UNDISTORT_MAX_ITERATIONS {
       let (p, dp) = self.distort(point, true);
-      point = p;
-      let delta = dp.unwrap().try_inverse().unwrap() * (dist - point);
+      let delta = dp.unwrap().try_inverse().unwrap() * (dist - p);
       point += delta;
       if delta.norm() < UNDISTORT_CONVERGENCE_THRESHOLD { break }
     }
@@ -114,7 +112,7 @@ mod tests {
     let pixel = camera.ray_to_pixel(ray0).unwrap();
     assert!((pixel - Vector2d::new(235., 695.)).norm() < 1e-6);
     let ray = camera.pixel_to_ray(pixel).unwrap();
-    assert!((ray - ray0).norm() < 1e-6);
+    assert!((ray - ray0).norm() < 1e-10);
 
     let K = Matrix3d::new(
       458., 0., 367.215,
@@ -123,10 +121,8 @@ mod tests {
     );
     let camera = PinholeModel::new(K, vec![-0.28340811, 0.07395907, 0.00019359]);
     let pixel = camera.ray_to_pixel(ray0).unwrap();
-    dbg!(pixel);
     assert!((pixel - Vector2d::new(310.26612557476517, 273.4325047471033)).norm() < 1e-6);
     let ray = camera.pixel_to_ray(pixel).unwrap();
-    dbg!((ray - ray0).norm());
-    assert!((ray - ray0).norm() < 1e-3);
+    assert!((ray - ray0).norm() < 1e-10);
   }
 }

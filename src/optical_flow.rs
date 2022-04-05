@@ -7,6 +7,8 @@ use crate::all::*;
 
 type Range = [[i16; 2]; 2];
 
+const AVERAGE_DISTANCE_METERS: f64 = 5.;
+
 #[allow(non_snake_case)]
 pub struct OpticalFlow {
   lk_iters: usize,
@@ -77,11 +79,21 @@ impl OpticalFlow {
   ) {
     features0.clear();
     features1.clear();
+    let cam0_to_cam1 = cameras[1].imu_to_camera * cameras[0].imu_to_camera.try_inverse().unwrap();
     for feature0 in features0_in {
+      let mut point1_in = None;
+      if let Some(ray) = cameras[0].model.pixel_to_ray(feature0.point) {
+        let r0 = AVERAGE_DISTANCE_METERS * ray;
+        let r1 = transform_vector3d(&cam0_to_cam1, &r0);
+        let r1 = r1.normalize(); // TODO needed?
+        // TODO Check these are correct by a visualization?
+        point1_in = cameras[1].model.ray_to_pixel(r1);
+      }
       if let Some(feature1) = self.process_feature(
         frame_camera0,
         frame_camera1,
         *feature0,
+        point1_in,
       ) {
         features1.push(feature1);
         features0.push(*feature0);
@@ -97,7 +109,6 @@ impl OpticalFlow {
       if p.show_epipolar { d.epipolar.clear() }
       let curve_point_count = 8;
       let mut curve = vec![];
-      let cam0_to_cam1 = cameras[1].imu_to_camera * cameras[0].imu_to_camera.try_inverse().unwrap();
       for (feature0, feature1) in features0.iter().zip(features1.iter()) {
         curve.clear();
         if let Some(ray) = cameras[0].model.pixel_to_ray(feature0.point) {
@@ -112,6 +123,8 @@ impl OpticalFlow {
             }
           }
         }
+        // TODO Remove tracked features that do not lie on the curve.
+        // TODO Use a point on the curve as initial guess for the flow.
         if p.show_epipolar {
           d.epipolar.push((*feature0, *feature1, curve.clone()));
         }
@@ -139,10 +152,15 @@ impl OpticalFlow {
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
     feature0: Feature,
+    point1_in: Option<Vector2d>,
   ) -> Option<Feature> {
     let term2 = self.lk_term.powi(2);
     let r = (self.lk_win_size - 1) / 2;
-    let mut g = Vector2d::zeros();
+    // let mut g = Vector2d::zeros();
+    // TODO Test if this initial guess reduces epipolar check rejections. Check
+    //   the divisor of this formula.
+    let mut g = point1_in.map(|p| p - feature0.point).unwrap_or(Vector2d::zeros())
+      / u32::pow(2, self.lk_levels as u32) as f64;
     let mut nu = Vector2d::zeros();
     for L in (0..self.lk_levels + 1).rev() {
       let level0 = frame_camera0.get_level(L);
