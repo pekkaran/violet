@@ -68,6 +68,7 @@ impl OpticalFlow {
     kind: OpticalFlowKind,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
+    cameras: &[Camera],
     features0_in: &[Feature],
     // `feature0_in` with failed features removed.
     features0: &mut Vec<Feature>,
@@ -87,12 +88,42 @@ impl OpticalFlow {
       }
     }
 
+    // Epipolar check. Heavily based on:
+    //   <https://github.com/SpectacularAI/HybVIO/blob/main/src/tracker/tracker.cpp>
+    use OpticalFlowKind::*;
+    if kind == LeftCurrentToRightCurrent || kind == LeftCurrentToRightCurrentDetection {
+      let d = &mut DEBUG_DATA.lock().unwrap();
+      let p = PARAMETER_SET.lock().unwrap();
+      if p.show_epipolar { d.epipolar.clear() }
+      let curve_point_count = 8;
+      let mut curve = vec![];
+      let cam0_to_cam1 = cameras[1].imu_to_camera * cameras[0].imu_to_camera.try_inverse().unwrap();
+      for (feature0, feature1) in features0.iter().zip(features1.iter()) {
+        curve.clear();
+        if let Some(ray) = cameras[0].model.pixel_to_ray(feature0.point) {
+          let mut s = 0.5;
+          for _ in 0..curve_point_count {
+            let r0 = s * ray;
+            let r1 = transform_vector3d(&cam0_to_cam1, &r0);
+            let r1 = r1.normalize(); // TODO needed?
+            if let Some(pixel) = cameras[1].model.ray_to_pixel(r1) {
+              curve.push(pixel);
+              s *= 2.;
+            }
+          }
+        }
+        if p.show_epipolar {
+          d.epipolar.push((*feature0, *feature1, curve.clone()));
+        }
+      }
+    }
+
     let d = &mut DEBUG_DATA.lock().unwrap();
     let p = PARAMETER_SET.lock().unwrap();
     for x in [
-      (p.show_flow0, OpticalFlowKind::LeftPreviousToCurrent),
-      (p.show_flow1, OpticalFlowKind::LeftCurrentToRightCurrent),
-      (p.show_flow2, OpticalFlowKind::LeftCurrentToRightCurrentDetection),
+      (p.show_flow0, LeftPreviousToCurrent),
+      (p.show_flow1, LeftCurrentToRightCurrent),
+      (p.show_flow2, LeftCurrentToRightCurrentDetection),
     ] {
       if !x.0 || kind != x.1 { continue }
       d.flow0.clear();
@@ -309,6 +340,10 @@ fn bilinear(frame: &Image, u: Vector2d) -> f64 {
       + (1. - xa) * ya * frame.data[y1 * frame.width + x0] as f64
       + xa * ya * frame.data[y1 * frame.width + x1] as f64
   }
+}
+
+fn transform_vector3d(m: &Matrix4d, v: &Vector3d) -> Vector3d {
+  m.fixed_slice::<3, 3>(0, 0) * v + m.fixed_slice::<3, 1>(0, 3)
 }
 
 #[cfg(test)]

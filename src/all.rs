@@ -34,6 +34,7 @@ pub use {
   },
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
   log::{debug, error, info, warn, LevelFilter},
-  nalgebra::{dmatrix, dvector, DMatrix, matrix},
+  nalgebra::{dmatrix, dvector, matrix, DMatrix},
+  rand::{thread_rng, Rng},
   serde::Deserialize,
 };

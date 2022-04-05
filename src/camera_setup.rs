@@ -60,7 +60,7 @@ fn convert_setup(d: CameraSetup) -> Result<Camera> {
   };
   Ok(Camera {
     kind,
-    imu_to_camera: Matrix4d::from_iterator(d.imuToCamera.into_iter().flatten()),
+    imu_to_camera: Matrix4d::from_iterator(d.imuToCamera.into_iter().flatten()).transpose(),
     model,
   })
 }

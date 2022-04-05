@@ -41,4 +41,6 @@ pub struct ParameterSet {
   pub show_flow1: bool,
   #[clap(long)]
   pub show_flow2: bool,
+  #[clap(long)]
+  pub show_epipolar: bool,
 }

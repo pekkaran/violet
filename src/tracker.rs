@@ -38,12 +38,14 @@ impl Tracker {
     &mut self,
     frame0: Option<&Frame>,
     frame1: &Frame,
+    cameras: &[Camera],
   ) {
     if let Some(frame0) = frame0 {
       self.optical_flow.process(
         OpticalFlowKind::LeftPreviousToCurrent,
         &frame0.cameras[0],
         &frame1.cameras[0],
+        &cameras,
         &self.features1,
         &mut self.features2,
         &mut self.features0,
@@ -53,6 +55,7 @@ impl Tracker {
         OpticalFlowKind::LeftCurrentToRightCurrent,
         &frame1.cameras[0],
         &frame1.cameras[1],
+        &cameras,
         &self.features0,
         &mut self.features1,
         &mut self.features2,
@@ -77,6 +80,7 @@ impl Tracker {
       OpticalFlowKind::LeftCurrentToRightCurrentDetection,
       &frame1.cameras[0],
       &frame1.cameras[1],
+      &cameras,
       &self.features0,
       &mut self.features1,
       &mut self.features2,

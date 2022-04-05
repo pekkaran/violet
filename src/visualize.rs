@@ -93,13 +93,13 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   if p.show_mask {
     for i in 0..d.detection_mask.len() {
       if !d.detection_mask[i] { continue }
-      draw_pixel(args, from_usize(&Vector2usize::new(i % args.video_w, i / args.video_w)), 255 * 255 * 255);
+      draw_pixel(args, from_usize(Vector2usize::new(i % args.video_w, i / args.video_w)), 255 * 255 * 255);
     }
   }
 
   if p.show_features {
     for feature in &d.detections {
-      draw_square(args, from_f64(&feature.point), 255 * 255, 3);
+      draw_square(args, from_f64(feature.point), 255 * 255, 3);
     }
   }
 
@@ -117,13 +117,13 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
         let color = blue | ((green as u32) << 8) | ((red as u32) << 16);
         for k in 0..2 {
           if i == 1 {
-            draw_square(args, &from_f64(&track.points[n][k]) + a[k], color, 3);
+            draw_square(args, &from_f64(track.points[n][k]) + a[k], color, 3);
             // TODO remove
             if k == 1 {
-              draw_square(args, &from_f64(&track.points[n][0]) + a[k], 255, 3);
+              draw_square(args, &from_f64(track.points[n][0]) + a[k], 255, 3);
             }
           }
-          draw_line(args, from_f64(&track.points[n - 1][k]) + a[k], from_f64(&track.points[n][k]) + a[k], color);
+          draw_line(args, from_f64(track.points[n - 1][k]) + a[k], from_f64(track.points[n][k]) + a[k], color);
         }
       }
     }
@@ -141,16 +141,29 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
     }
   }
   */
+  let ax = Vector2d::new(im0.width as f64, 0.);
   if p.show_flow1 || p.show_flow2 {
-    let ax = Vector2d::new(im0.width as f64, 0.);
     for (f0, f1) in d.flow0.iter().zip(d.flow1.iter()) {
       let p0 = f0.point;
       let p1 = f1.point + ax;
       // Could randomize a color for each track.
-      draw_line(args, from_f64(&p0), from_f64(&p1), 255 * 255);
-      draw_square(args, from_f64(&p0), 255 * 255, 3);
-      draw_square(args, from_f64(&p1), 255 * 255, 3);
-      draw_square(args, from_f64(&(p0 + ax)), 255 * 255 * 255, 3);
+      draw_line(args, from_f64(p0), from_f64(p1), 255 * 255);
+      draw_square(args, from_f64(p0), 255 * 255, 3);
+      draw_square(args, from_f64(p1), 255 * 255, 3);
+      draw_square(args, from_f64(p0 + ax), 255 * 255 * 255, 3);
+    }
+  }
+
+  if p.show_epipolar {
+    let mut rng = thread_rng();
+    for (f0, f1, curve) in &d.epipolar {
+      let color: [u8; 3] = [rng.gen(), rng.gen(), rng.gen()];
+      let color = (color[0] as u32) | ((color[1] as u32) << 8) | ((color[2] as u32) << 16);
+      draw_square(args, from_f64(f0.point), color, 3);
+      draw_square(args, from_f64(f1.point + ax), color, 3);
+      for i in 1..curve.len() {
+        draw_line(args, from_f64(curve[i - 1] + ax),  from_f64(curve[i] + ax), color);
+      }
     }
   }
   Ok(())

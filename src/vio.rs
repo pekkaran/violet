@@ -60,7 +60,7 @@ impl Vio {
 
     let frame0 = self.frames.iter().rev().nth(1);
     let frame1 = self.frames.iter().last().unwrap();
-    self.tracker.process(frame0, frame1);
+    self.tracker.process(frame0, frame1, &self.cameras);
     Ok(())
   }
 }
