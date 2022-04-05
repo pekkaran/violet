@@ -68,19 +68,22 @@ impl OpticalFlow {
     kind: OpticalFlowKind,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
-    features0: &[Feature],
+    features0_in: &[Feature],
+    // `feature0_in` with failed features removed.
+    features0: &mut Vec<Feature>,
+    // Successfully tracked features, same size as `features0`.
     features1: &mut Vec<Feature>,
   ) {
+    features0.clear();
     features1.clear();
-    let mut features0_debug = vec![]; // TODO Avoid unecessary allocations.
-    for feature0 in features0 {
+    for feature0 in features0_in {
       if let Some(feature1) = self.process_feature(
         frame_camera0,
         frame_camera1,
         *feature0,
       ) {
         features1.push(feature1);
-        features0_debug.push(*feature0);
+        features0.push(*feature0);
       }
     }
 
@@ -92,7 +95,8 @@ impl OpticalFlow {
       (p.show_flow2, OpticalFlowKind::LeftCurrentToRightCurrentDetection),
     ] {
       if !x.0 || kind != x.1 { continue }
-      d.flow0 = mem::take(&mut features0_debug);
+      d.flow0.clear();
+      d.flow0.extend(features0.iter());
       d.flow1.clear();
       d.flow1.extend(features1.iter());
     }

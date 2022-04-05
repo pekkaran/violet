@@ -44,30 +44,32 @@ impl Tracker {
         OpticalFlowKind::LeftPreviousToCurrent,
         &frame0.cameras[0],
         &frame1.cameras[0],
-        &self.features0,
-        &mut self.features1,
+        &self.features1,
+        &mut self.features2,
+        &mut self.features0,
       );
 
       self.optical_flow.process(
         OpticalFlowKind::LeftCurrentToRightCurrent,
         &frame1.cameras[0],
         &frame1.cameras[1],
-        &self.features1,
-        &mut self.features0,
+        &self.features0,
+        &mut self.features1,
+        &mut self.features2,
       );
-      update_tracks(&mut self.tracks, &self.features1, &self.features0, false, self.step);
+      update_tracks(&mut self.tracks, &self.features1, &self.features2, false, self.step);
     }
 
     // TODO Make this adaptive.
     let min_distance = 5.0;
     sparsify_tracks(&mut self.tracks, min_distance);
 
-    assert!(self.features0.len() <= self.max_tracks);
-    let needed_features_count = self.max_tracks - self.features0.len();
+    assert!(self.features2.len() <= self.max_tracks);
+    let needed_features_count = self.max_tracks - self.features2.len();
 
     self.detector.process(
       &frame1.cameras[0].image,
-      &mut self.features1,
+      &mut self.features0,
       needed_features_count,
       &mut self.next_id
     );
@@ -75,10 +77,10 @@ impl Tracker {
       OpticalFlowKind::LeftCurrentToRightCurrentDetection,
       &frame1.cameras[0],
       &frame1.cameras[1],
-      &self.features1,
+      &self.features0,
+      &mut self.features1,
       &mut self.features2,
     );
-    self.features0.extend(self.features2.iter());
     update_tracks(&mut self.tracks, &self.features1, &self.features2, true, self.step);
 
     self.step.0 += 1
@@ -92,21 +94,18 @@ fn update_tracks(
   new_tracks: bool,
   step: TrackerStep,
 ) {
-  for feature0 in features0 {
-    for feature1 in features1 {
-      if feature1.id == feature0.id {
-        if new_tracks {
-          tracks.push(Track::new(*feature0, *feature1, step));
+  assert_eq!(features0.len(), features1.len());
+  for (feature0, feature1) in features0.iter().zip(features1.iter()) {
+    assert_eq!(feature0.id, feature1.id);
+    if new_tracks {
+      tracks.push(Track::new(*feature0, *feature1, step));
+    }
+    else {
+      for track in tracks.iter_mut() {
+        if track.id == feature0.id {
+          track.points.push([feature0.point, feature1.point]);
+          track.last_seen = step;
         }
-        else {
-          for track in tracks.iter_mut() {
-            if track.id == feature0.id {
-              track.points.push([feature0.point, feature1.point]);
-              track.last_seen = step;
-            }
-          }
-        }
-        break;
       }
     }
   }
