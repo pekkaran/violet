@@ -11,5 +11,13 @@ pub struct DebugData {
   pub flow0: Vec<Feature>,
   pub flow1: Vec<Feature>,
   pub tracks: Vec<Track>,
-  pub epipolar: Vec<(Feature, Feature, Vec<Vector2d>)>
+  pub epipolar: Vec<DebugEpipolar>,
+}
+
+#[derive(Default)]
+pub struct DebugEpipolar {
+  pub p0: Vector2d,
+  pub p1: Vector2d,
+  pub p1_initial: Option<Vector2d>,
+  pub curve1: Vec<Vector2d>,
 }

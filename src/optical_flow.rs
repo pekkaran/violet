@@ -9,6 +9,23 @@ type Range = [[i16; 2]; 2];
 
 const AVERAGE_DISTANCE_METERS: f64 = 5.;
 
+fn compute_initial_guess(
+  p0: Vector2d,
+  cameras: &[Camera],
+  cam0_to_cam1: &Matrix4d,
+) -> Option<Vector2d> {
+  if let Some(ray) = cameras[0].model.pixel_to_ray(p0) {
+    let r0 = AVERAGE_DISTANCE_METERS * ray;
+    let r1 = transform_vector3d(&cam0_to_cam1, &r0);
+    let r1 = r1.normalize(); // TODO needed?
+    // TODO Check these are correct by a visualization?
+    cameras[1].model.ray_to_pixel(r1)
+  }
+  else {
+    None
+  }
+}
+
 #[allow(non_snake_case)]
 pub struct OpticalFlow {
   lk_iters: usize,
@@ -81,14 +98,7 @@ impl OpticalFlow {
     features1.clear();
     let cam0_to_cam1 = cameras[1].imu_to_camera * cameras[0].imu_to_camera.try_inverse().unwrap();
     for feature0 in features0_in {
-      let mut point1_in = None;
-      if let Some(ray) = cameras[0].model.pixel_to_ray(feature0.point) {
-        let r0 = AVERAGE_DISTANCE_METERS * ray;
-        let r1 = transform_vector3d(&cam0_to_cam1, &r0);
-        let r1 = r1.normalize(); // TODO needed?
-        // TODO Check these are correct by a visualization?
-        point1_in = cameras[1].model.ray_to_pixel(r1);
-      }
+      let point1_in = compute_initial_guess(feature0.point, cameras, &cam0_to_cam1);
       if let Some(feature1) = self.process_feature(
         frame_camera0,
         frame_camera1,
@@ -124,9 +134,15 @@ impl OpticalFlow {
           }
         }
         // TODO Remove tracked features that do not lie on the curve.
-        // TODO Use a point on the curve as initial guess for the flow.
+
         if p.show_epipolar {
-          d.epipolar.push((*feature0, *feature1, curve.clone()));
+          let p1_initial = compute_initial_guess(feature0.point, cameras, &cam0_to_cam1);
+          d.epipolar.push(DebugEpipolar {
+            p0: feature0.point,
+            p1: feature1.point,
+            p1_initial,
+            curve1: curve.clone(),
+          });
         }
       }
     }
