@@ -455,11 +455,16 @@ mod tests {
       id: TrackId(0),
     };
     let mut flow = OpticalFlow::new_custom(lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig).unwrap();
-    if let Some(feature1) = flow.process_feature(&camera0, &camera1, feature0) {
+    // let guess = feature0.point + Vector2d::new(dx as f64, dy as f64);
+    // if let Some(feature1) = flow.process_feature(&camera0, &camera1, feature0, Some(guess)) {
+    if let Some(feature1) = flow.process_feature(&camera0, &camera1, feature0, None) {
       // The found feature should be near center of the second patch.
       let err = (feature1.point - feature0.point) - Vector2d::new(dx as f64, dy as f64);
       dbg!(err.norm());
       // dbg!(feature1, err);
+    }
+    else {
+      assert!(false);
     }
   }
 
