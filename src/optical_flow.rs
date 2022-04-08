@@ -9,23 +9,6 @@ type Range = [[i16; 2]; 2];
 
 const AVERAGE_DISTANCE_METERS: f64 = 5.;
 
-fn compute_initial_guess(
-  p0: Vector2d,
-  cameras: &[Camera],
-  cam0_to_cam1: &Matrix4d,
-) -> Option<Vector2d> {
-  if let Some(ray) = cameras[0].model.pixel_to_ray(p0) {
-    let r0 = AVERAGE_DISTANCE_METERS * ray;
-    let r1 = transform_vector3d(&cam0_to_cam1, &r0);
-    let r1 = r1.normalize(); // TODO needed?
-    // TODO Check these are correct by a visualization?
-    cameras[1].model.ray_to_pixel(r1)
-  }
-  else {
-    None
-  }
-}
-
 #[allow(non_snake_case)]
 pub struct OpticalFlow {
   lk_iters: usize,
@@ -87,7 +70,7 @@ impl OpticalFlow {
     kind: OpticalFlowKind,
     frame_camera0: &FrameCamera,
     frame_camera1: &FrameCamera,
-    cameras: &[Camera],
+    cameras: &[&Camera],
     features0_in: &[Feature],
     // `feature0_in` with failed features removed.
     features0: &mut Vec<Feature>,
@@ -172,7 +155,6 @@ impl OpticalFlow {
   ) -> Option<Feature> {
     let term2 = self.lk_term.powi(2);
     let r = (self.lk_win_size - 1) / 2;
-    // let mut g = Vector2d::zeros();
     // TODO Test if this initial guess reduces epipolar check rejections. Check
     //   the divisor of this formula.
     let mut g = point1_in.map(|p| p - feature0.point).unwrap_or(Vector2d::zeros())
@@ -204,6 +186,18 @@ impl OpticalFlow {
     // if kind == OpticalFlowKind::LeftPreviousToCurrent {
     //   if self.It.component_mul(&self.It).sum() / (self.It.nrows() * self.It.ncols()) as f64 > 1000. {
     //     return None;
+    //   }
+    // }
+
+    // if let Some(point1_in) = point1_in {
+    //   let feature1 = Feature {
+    //     point: feature0.point + g + nu,
+    //     id: feature0.id,
+    //   };
+    //   let good = (point1_in - feature1.point).norm();
+    //   let bad = (feature0.point - feature1.point).norm();
+    //   if bad < good {
+    //     info!("{} {}", bad, good);
     //   }
     // }
     Some(Feature {
@@ -378,6 +372,24 @@ fn bilinear(frame: &Image, u: Vector2d) -> f64 {
 
 fn transform_vector3d(m: &Matrix4d, v: &Vector3d) -> Vector3d {
   m.fixed_slice::<3, 3>(0, 0) * v + m.fixed_slice::<3, 1>(0, 3)
+}
+
+fn compute_initial_guess(
+  p0: Vector2d,
+  cameras: &[&Camera],
+  cam0_to_cam1: &Matrix4d,
+) -> Option<Vector2d> {
+  if cameras[0].imu_to_camera == cameras[1].imu_to_camera { return None }
+  if let Some(ray) = cameras[0].model.pixel_to_ray(p0) {
+    let r0 = AVERAGE_DISTANCE_METERS * ray;
+    let r1 = transform_vector3d(&cam0_to_cam1, &r0);
+    let r1 = r1.normalize(); // TODO needed?
+    // TODO Check these are correct by a visualization?
+    cameras[1].model.ray_to_pixel(r1)
+  }
+  else {
+    None
+  }
 }
 
 #[cfg(test)]

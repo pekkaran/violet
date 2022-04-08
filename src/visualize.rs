@@ -161,11 +161,11 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
       let color: [u8; 3] = [rng.gen(), rng.gen(), rng.gen()];
       let color = (color[0] as u32) | ((color[1] as u32) << 8) | ((color[2] as u32) << 16);
       draw_square(args, from_f64(e.p0), color, 3);
-      draw_square(args, from_f64(e.p1 + ax), color, 3);
       if let Some(p1_initial) = e.p1_initial {
         draw_square(args, from_f64(p1_initial + ax), white, 3);
         draw_line(args, from_f64(p1_initial + ax),  from_f64(e.p1 + ax), white);
       }
+      draw_square(args, from_f64(e.p1 + ax), color, 3);
       for i in 1..e.curve1.len() {
         draw_line(args, from_f64(e.curve1[i - 1] + ax),  from_f64(e.curve1[i] + ax), color);
       }
