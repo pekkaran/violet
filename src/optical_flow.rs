@@ -155,11 +155,9 @@ impl OpticalFlow {
   ) -> Option<Feature> {
     let term2 = self.lk_term.powi(2);
     let r = (self.lk_win_size - 1) / 2;
-    // TODO Test if this initial guess reduces epipolar check rejections. Check
-    //   the divisor of this formula.
     let mut g = point1_in.map(|p| p - feature0.point).unwrap_or(Vector2d::zeros())
       / u32::pow(2, self.lk_levels as u32) as f64;
-    let mut nu = Vector2d::zeros();
+    let mut d = Vector2d::zeros();
     for L in (0..self.lk_levels + 1).rev() {
       let level0 = frame_camera0.get_level(L);
       let level1 = frame_camera1.get_level(L);
@@ -169,6 +167,7 @@ impl OpticalFlow {
       let G = spatial_gradient(range, &self.Ix, &self.Iy);
       if G.eigenvalues()?.min() < self.lk_min_eig { return None }
       let mut converged = false;
+      let mut nu = Vector2d::zeros();
       for _ in 0..self.lk_iters {
         image_difference(range, r, &self.grid0, &mut self.It, &level1, u + g + nu)?;
         let eta = flow_vector(&G, &self.Ix, &self.Iy, &self.It)?;
@@ -178,8 +177,9 @@ impl OpticalFlow {
           break;
         }
       }
+      d = nu;
       if !converged { return None }
-      if L > 0 { g = 2. * (g + nu) }
+      if L > 0 { g = 2. * (g + d) }
     }
     // Verify match in the one-camera tracking where distortions are expected to
     // be smaller.
@@ -191,7 +191,7 @@ impl OpticalFlow {
 
     // if let Some(point1_in) = point1_in {
     //   let feature1 = Feature {
-    //     point: feature0.point + g + nu,
+    //     point: feature0.point + g + d,
     //     id: feature0.id,
     //   };
     //   let good = (point1_in - feature1.point).norm();
@@ -201,7 +201,7 @@ impl OpticalFlow {
     //   }
     // }
     Some(Feature {
-      point: feature0.point + g + nu,
+      point: feature0.point + g + d,
       id: feature0.id,
     })
   }
