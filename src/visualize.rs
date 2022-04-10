@@ -66,6 +66,31 @@ fn draw_buffer(
   }
 }
 
+#[allow(dead_code)]
+fn draw_scaled(
+  args: &mut VisualizeArgs,
+  image: &Image,
+  s: f64,
+  // Top-left coordinates of drawing target.
+  ax: usize,
+  ay: usize,
+) {
+  assert!(s > 0.);
+  let is = 1. / s;
+  let w = 1 + (s * (image.width - 1) as f64).floor() as usize;
+  let h = 1 + (s * (image.height - 1) as f64).floor() as usize;
+  for y in 0..h {
+    if y + ay >= args.buffer_h { continue }
+    let isy = is * y as f64;
+    for x in 0..w {
+      if x + ax >= args.buffer_w { continue }
+      let isx = is * x as f64;
+      let gray = bilinear(image, Vector2d::new(isx, isy)).round() as u32;
+      args.buffer[(y + ay) * args.buffer_w + x + ax] = gray | (gray << 8) | (gray << 16);
+    }
+  }
+}
+
 pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   // Clear buffer.
   for y in 0..args.buffer_h {

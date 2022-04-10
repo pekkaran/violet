@@ -338,38 +338,6 @@ fn scharr(
   }
 }
 
-#[inline(always)]
-fn bilinear(frame: &Image, u: Vector2d) -> f64 {
-  assert!(u[0] >= 0.0 && u[0] <= frame.width as f64 - 1.);
-  assert!(u[1] >= 0.0 && u[1] <= frame.height as f64 - 1.);
-  let x0 = u[0] as usize;
-  let y0 = u[1] as usize;
-  let x1 = x0 + 1;
-  let y1 = y0 + 1;
-  let xa = u[0].fract();
-  let ya = u[1].fract();
-  // Besides improving computation speed, these allow to work one pixel
-  // closer to the right and bottom edges when coordinates are integers.
-  let eps = 1e-5;
-  if xa < eps && ya < eps {
-    frame.data[y0 * frame.width + x0] as f64
-  }
-  else if xa < eps {
-    (1. - ya) * frame.data[y0 * frame.width + x0] as f64
-      + ya * frame.data[y1 * frame.width + x0] as f64
-  }
-  else if ya < eps {
-    (1. - xa) * frame.data[y0 * frame.width + x0] as f64
-      + xa * frame.data[y0 * frame.width + x1] as f64
-  }
-  else {
-    (1. - xa) * (1. - ya) * frame.data[y0 * frame.width + x0] as f64
-      + xa * (1. - ya) * frame.data[y0 * frame.width + x1] as f64
-      + (1. - xa) * ya * frame.data[y1 * frame.width + x0] as f64
-      + xa * ya * frame.data[y1 * frame.width + x1] as f64
-  }
-}
-
 fn transform_vector3d(m: &Matrix4d, v: &Vector3d) -> Vector3d {
   m.fixed_slice::<3, 3>(0, 0) * v + m.fixed_slice::<3, 1>(0, 3)
 }
