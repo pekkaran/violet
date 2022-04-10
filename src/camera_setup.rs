@@ -26,12 +26,15 @@ const SETUP_FILE_NAME: &'static str = "calibration.json";
 
 impl Camera {
   pub fn load(path: &Path) -> Result<Vec<Camera>> {
-    let path = path.to_path_buf();
+    let mut path = path.to_path_buf();
     for _ in 0..(MAX_PARENT_DIRECTORY_HEIGHT + 1) {
       let setup_path = path.join(SETUP_FILE_NAME);
       if setup_path.exists() {
         return parse_setup(&setup_path);
       }
+      path = path.parent()
+        .expect(&format!("Cannot look {} in a parent directory", SETUP_FILE_NAME))
+        .to_path_buf();
     }
     bail!("Failed to find a {}.", SETUP_FILE_NAME);
   }
