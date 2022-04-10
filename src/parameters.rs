@@ -25,6 +25,8 @@ pub struct ParameterSet {
   pub lk_term: f64,
   #[clap(long, default_value = "1e-4")]
   pub lk_min_eig: f64,
+  #[clap(long, default_value = "2")]
+  pub lk_epipolar_max_dist: f64,
 
   // Visualizations.
   #[clap(long)]

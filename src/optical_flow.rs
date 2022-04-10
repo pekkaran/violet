@@ -16,6 +16,7 @@ pub struct OpticalFlow {
   lk_win_size: usize,
   lk_term: f64,
   lk_min_eig: f64,
+  lk_epipolar_max_dist: f64,
   Ix: Matrixd,
   Iy: Matrixd,
   It: Matrixd,
@@ -32,11 +33,12 @@ pub enum OpticalFlowKind {
 
 impl OpticalFlow {
   pub fn new() -> Result<OpticalFlow> {
-    let (lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig) = {
+    // TODO This pattern is getting unwieldy with so many parameters.
+    let (lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig, lk_epipolar_max_dist) = {
       let p = PARAMETER_SET.lock().unwrap();
-      (p.lk_iters, p.lk_levels, p.lk_win_size, p.lk_term, p.lk_min_eig)
+      (p.lk_iters, p.lk_levels, p.lk_win_size, p.lk_term, p.lk_min_eig, p.lk_epipolar_max_dist)
     };
-    Self::new_custom(lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig)
+    Self::new_custom(lk_iters, lk_levels, lk_win_size, lk_term, lk_min_eig, lk_epipolar_max_dist)
   }
 
   pub fn new_custom(
@@ -45,6 +47,7 @@ impl OpticalFlow {
     lk_win_size: usize,
     lk_term: f64,
     lk_min_eig: f64,
+    lk_epipolar_max_dist: f64,
   ) -> Result<OpticalFlow> {
     if lk_win_size % 2 != 1 {
       bail!("Lucas-Kanade window size must be odd number.");
@@ -58,6 +61,7 @@ impl OpticalFlow {
       lk_win_size,
       lk_term,
       lk_min_eig,
+      lk_epipolar_max_dist,
       Ix: DMatrix::zeros(lk_win_size, lk_win_size),
       Iy: DMatrix::zeros(lk_win_size, lk_win_size),
       It: DMatrix::zeros(lk_win_size, lk_win_size),
@@ -77,61 +81,30 @@ impl OpticalFlow {
     // Successfully tracked features, same size as `features0`.
     features1: &mut Vec<Feature>,
   ) {
+    {
+      let d = &mut DEBUG_DATA.lock().unwrap();
+      let p = PARAMETER_SET.lock().unwrap();
+      if p.show_epipolar { d.epipolar.clear() }
+    }
+    let lk_epipolar_max_dist2 = (frame_camera0.image.scale() * self.lk_epipolar_max_dist).powi(2);
+
     features0.clear();
     features1.clear();
     let cam0_to_cam1 = cameras[1].imu_to_camera * cameras[0].imu_to_camera.try_inverse().unwrap();
     for feature0 in features0_in {
       let point1_in = compute_initial_guess(feature0.point, cameras, &cam0_to_cam1);
-      if let Some(feature1) = self.process_feature(
-        frame_camera0,
-        frame_camera1,
-        *feature0,
-        point1_in,
-      ) {
-        features1.push(feature1);
-        features0.push(*feature0);
+      let feature1 = self.process_feature(frame_camera0, frame_camera1, *feature0, point1_in);
+      let feature1 = if let Some(feature1) = feature1 { feature1 } else { continue };
+      if !epipolar_check(&feature0, &feature1, kind, cameras, &cam0_to_cam1, lk_epipolar_max_dist2) {
+        continue;
       }
-    }
-
-    // Epipolar check. Heavily based on:
-    //   <https://github.com/SpectacularAI/HybVIO/blob/main/src/tracker/tracker.cpp>
-    use OpticalFlowKind::*;
-    if kind == LeftCurrentToRightCurrent || kind == LeftCurrentToRightCurrentDetection {
-      let d = &mut DEBUG_DATA.lock().unwrap();
-      let p = PARAMETER_SET.lock().unwrap();
-      if p.show_epipolar { d.epipolar.clear() }
-      let curve_point_count = 8;
-      let mut curve = vec![];
-      for (feature0, feature1) in features0.iter().zip(features1.iter()) {
-        curve.clear();
-        if let Some(ray) = cameras[0].model.pixel_to_ray(feature0.point) {
-          let mut s = 0.5;
-          for _ in 0..curve_point_count {
-            let r0 = s * ray;
-            let r1 = transform_vector3d(&cam0_to_cam1, &r0);
-            let r1 = r1.normalize(); // TODO needed?
-            if let Some(pixel) = cameras[1].model.ray_to_pixel(r1) {
-              curve.push(pixel);
-              s *= 2.;
-            }
-          }
-        }
-        // TODO Remove tracked features that do not lie on the curve.
-
-        if p.show_epipolar {
-          let p1_initial = compute_initial_guess(feature0.point, cameras, &cam0_to_cam1);
-          d.epipolar.push(DebugEpipolar {
-            p0: feature0.point,
-            p1: feature1.point,
-            p1_initial,
-            curve1: curve.clone(),
-          });
-        }
-      }
+      features1.push(feature1);
+      features0.push(*feature0);
     }
 
     let d = &mut DEBUG_DATA.lock().unwrap();
     let p = PARAMETER_SET.lock().unwrap();
+    use OpticalFlowKind::*;
     for x in [
       (p.show_flow0, LeftPreviousToCurrent),
       (p.show_flow1, LeftCurrentToRightCurrent),
@@ -186,18 +159,6 @@ impl OpticalFlow {
     // if kind == OpticalFlowKind::LeftPreviousToCurrent {
     //   if self.It.component_mul(&self.It).sum() / (self.It.nrows() * self.It.ncols()) as f64 > 1000. {
     //     return None;
-    //   }
-    // }
-
-    // if let Some(point1_in) = point1_in {
-    //   let feature1 = Feature {
-    //     point: feature0.point + g + d,
-    //     id: feature0.id,
-    //   };
-    //   let good = (point1_in - feature1.point).norm();
-    //   let bad = (feature0.point - feature1.point).norm();
-    //   if bad < good {
-    //     info!("{} {}", bad, good);
     //   }
     // }
     Some(Feature {
@@ -358,6 +319,65 @@ fn compute_initial_guess(
   else {
     None
   }
+}
+
+// Heavily based on:
+//   <https://github.com/SpectacularAI/HybVIO/blob/main/src/tracker/tracker.cpp>
+fn epipolar_check(
+  feature0: &Feature,
+  feature1: &Feature,
+  kind: OpticalFlowKind,
+  cameras: &[&Camera],
+  cam0_to_cam1: &Matrix4d,
+  max_dist2: f64,
+) -> bool {
+  // Compute a curve in image1 where feature1 should be found.
+  use OpticalFlowKind::*;
+  if kind != LeftCurrentToRightCurrent && kind != LeftCurrentToRightCurrentDetection { return true }
+  let curve_point_count = 8;
+  let mut curve = vec![]; // TODO preallocate
+  curve.clear();
+  if let Some(ray) = cameras[0].model.pixel_to_ray(feature0.point) {
+    let mut s = 0.5;
+    for _ in 0..curve_point_count {
+      let r0 = s * ray;
+      let r1 = transform_vector3d(&cam0_to_cam1, &r0);
+      let r1 = r1.normalize(); // TODO needed?
+      if let Some(pixel) = cameras[1].model.ray_to_pixel(r1) {
+        curve.push(pixel);
+        s *= 2.;
+      }
+    }
+  }
+
+  // Check if feature1 is on the curve.
+  // Reverse iterate because the feature is more likely near the "far end".
+  for c in curve.iter().rev() {
+    if (c - feature1.point).norm_squared() < max_dist2 { return true }
+  }
+  for i in 1..curve.len() {
+    let c0 = &curve[i - 1];
+    let c1 = &curve[i];
+    let s2 = (c1 - c0).norm_squared();
+    let t = (feature1.point - c0).dot(&(c1 - c0)) / s2;
+    if t > 0. && t < 1. && (feature1.point - (c0 + t * (c1 - c0))).norm_squared() < max_dist2 {
+      return true;
+    }
+  }
+
+  // Show failures.
+  let d = &mut DEBUG_DATA.lock().unwrap();
+  let p = PARAMETER_SET.lock().unwrap();
+  if p.show_epipolar {
+    let p1_initial = compute_initial_guess(feature0.point, cameras, &cam0_to_cam1);
+    d.epipolar.push(DebugEpipolar {
+      p0: feature0.point,
+      p1: feature1.point,
+      p1_initial,
+      curve1: curve.clone(),
+    });
+  }
+  false
 }
 
 #[cfg(test)]

@@ -29,6 +29,11 @@ impl Image {
     if dim == 0 { self.width } else { self.height }
   }
 
+  // Linear scaling factor for pixel-space parameters.
+  pub fn scale(&self) -> f64 {
+    (self.width + self.height) as f64 / 1000.
+  }
+
   #[inline(always)]
   #[allow(dead_code)]
   pub fn value(&self, x: usize, y: usize) -> u8 {
