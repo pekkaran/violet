@@ -8,6 +8,8 @@ mod event_loop;
 mod frame;
 mod image;
 mod input;
+mod kalman_filter;
+mod math;
 mod optical_flow;
 mod parameters;
 mod pyramid;

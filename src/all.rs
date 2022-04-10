@@ -10,6 +10,8 @@ pub use crate::{
   frame::*,
   image::*,
   input::*,
+  kalman_filter::*,
+  math::*,
   optical_flow::*,
   parameters::*,
   pyramid::*,
@@ -34,7 +36,7 @@ pub use {
   },
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
   log::{debug, error, info, warn, LevelFilter},
-  nalgebra::{dmatrix, dvector, matrix, DMatrix},
+  nalgebra::{dmatrix, dvector, matrix, DMatrix, DVector},
   rand::{thread_rng, Rng},
   serde::Deserialize,
 };

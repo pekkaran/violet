@@ -14,6 +14,7 @@ pub struct ParameterSet {
   #[clap(long, default_value = "400")]
   pub max_tracks: usize,
 
+  // TODO Use another parameter struct with the clap flattening option?
   // Pyramidal Lucas-Kanade feature tracker.
   #[clap(long, default_value = "3")]
   pub lk_levels: usize,
@@ -27,6 +28,9 @@ pub struct ParameterSet {
   pub lk_min_eig: f64,
   #[clap(long, default_value = "2")]
   pub lk_epipolar_max_dist: f64,
+
+  #[clap(long, default_value = "20")]
+  pub pose_trail_len: usize,
 
   // Visualizations.
   #[clap(long)]
