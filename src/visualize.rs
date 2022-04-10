@@ -149,10 +149,6 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
         for k in 0..2 {
           if i == 1 {
             draw_square(args, &from_f64(track.points[n][k]) + a[k], color, 3);
-            // TODO remove
-            if k == 1 {
-              draw_square(args, &from_f64(track.points[n][0]) + a[k], 255, 3);
-            }
           }
           draw_line(args, from_f64(track.points[n - 1][k]) + a[k], from_f64(track.points[n][k]) + a[k], color);
         }

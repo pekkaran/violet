@@ -6,13 +6,14 @@ pub struct TrackerStep(pub usize);
 pub struct Tracker {
   detector: Detector,
   optical_flow: OpticalFlow,
-  features0: Vec<Feature>,
-  features1: Vec<Feature>,
-  features2: Vec<Feature>,
   tracks: Vec<Track>,
   max_tracks: usize,
   next_id: TrackId,
   step: TrackerStep,
+  // Workspace.
+  features0: Vec<Feature>,
+  features1: Vec<Feature>,
+  features2: Vec<Feature>,
 }
 
 impl Tracker {
@@ -24,13 +25,13 @@ impl Tracker {
     Ok(Tracker {
       detector: Detector::new(),
       optical_flow: OpticalFlow::new()?,
-      features0: vec![],
-      features1: vec![],
-      features2: vec![],
       tracks: vec![],
       max_tracks,
       next_id: TrackId(0),
       step: TrackerStep(0),
+      features0: vec![],
+      features1: vec![],
+      features2: vec![],
     })
   }
 
@@ -41,6 +42,16 @@ impl Tracker {
     cameras: &[Camera],
   ) {
     if let Some(frame0) = frame0 {
+      self.features1.clear();
+      for track in &self.tracks {
+        if track.last_seen.0 + 1 == self.step.0 {
+          self.features1.push(Feature {
+            point: track.points.iter().last().unwrap()[0],
+            id: track.id,
+          });
+        }
+      }
+
       self.optical_flow.process(
         OpticalFlowKind::LeftPreviousToCurrent,
         &frame0.cameras[0],
@@ -109,6 +120,7 @@ fn update_tracks(
         if track.id == feature0.id {
           track.points.push([feature0.point, feature1.point]);
           track.last_seen = step;
+          break;
         }
       }
     }

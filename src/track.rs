@@ -9,7 +9,7 @@ pub struct Feature {
   pub id: TrackId,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Track {
   pub points: Vec<[Vector2d; 2]>,
   pub id: TrackId,
