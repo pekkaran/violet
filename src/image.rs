@@ -106,7 +106,6 @@ impl fmt::Display for Image {
 
 #[inline(always)]
 pub fn bilinear(image: &Image, u: Vector2d) -> f64 {
-  // dbg!(u);
   assert!(u[0] >= 0.0 && u[0] <= image.width as f64 - 1.);
   assert!(u[1] >= 0.0 && u[1] <= image.height as f64 - 1.);
   let x0 = u[0] as usize;

@@ -105,7 +105,14 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
   draw_buffer(args, &im0, 0, 0);
   draw_buffer(args, &im1, im0.width, 0);
 
+  let d = DEBUG_DATA.lock().unwrap();
   let p = PARAMETER_SET.lock().unwrap();
+  let mut ax = 0;
+  for (image, s) in &d.images {
+    draw_scaled(args, &image, *s, ax, im0.height);
+    ax += (s * image.width as f64) as usize;
+  }
+
   if p.show_pyramid {
     let mut a = [0, 0];
     for (i, level) in frame.cameras[0].pyramid.levels.iter().enumerate() {
@@ -114,7 +121,6 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
     }
   }
 
-  let d = DEBUG_DATA.lock().unwrap();
   if p.show_mask {
     for i in 0..d.detection_mask.len() {
       if !d.detection_mask[i] { continue }
@@ -181,15 +187,14 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
 
   if p.show_epipolar {
     let mut rng = thread_rng();
-    let white = 255 | (255 << 8) | (255 << 16);
     for e in &d.epipolar {
       let color: [u8; 3] = [rng.gen(), rng.gen(), rng.gen()];
       let color = (color[0] as u32) | ((color[1] as u32) << 8) | ((color[2] as u32) << 16);
       draw_square(args, from_f64(e.p0), color, 3);
-      if let Some(p1_initial) = e.p1_initial {
-        draw_square(args, from_f64(p1_initial + ax), white, 3);
-        draw_line(args, from_f64(p1_initial + ax),  from_f64(e.p1 + ax), white);
-      }
+      // if let Some(p1_initial) = e.p1_initial {
+      //   draw_square(args, from_f64(p1_initial + ax), white, 3);
+      //   draw_line(args, from_f64(p1_initial + ax),  from_f64(e.p1 + ax), white);
+      // }
       draw_square(args, from_f64(e.p1 + ax), color, 3);
       for i in 1..e.curve1.len() {
         draw_line(args, from_f64(e.curve1[i - 1] + ax),  from_f64(e.curve1[i] + ax), color);

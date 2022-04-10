@@ -12,6 +12,8 @@ pub struct DebugData {
   pub flow1: Vec<Feature>,
   pub tracks: Vec<Track>,
   pub epipolar: Vec<DebugEpipolar>,
+  // Any images with a scaling factor, will be shown side by side.
+  pub images: Vec<(Image, f64)>,
 }
 
 #[derive(Default)]
