@@ -31,6 +31,8 @@ pub struct ParameterSet {
 
   #[clap(long, default_value = "20")]
   pub pose_trail_len: usize,
+  #[clap(long, default_value = "9.81")]
+  pub gravity: f64,
 
   // Visualizations.
   #[clap(long)]
