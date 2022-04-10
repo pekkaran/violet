@@ -41,7 +41,7 @@ impl Frame {
       camera.image.data.extend(input_frame.images[i].data.iter());
       camera.image.width = input_frame.images[i].width;
       camera.image.height = input_frame.images[i].height;
-      Pyramid::compute(&mut camera.pyramid, &input_frame.images[0], lk_levels)?;
+      Pyramid::compute(&mut camera.pyramid, &input_frame.images[i], lk_levels)?;
     }
     Ok(frame)
   }
