@@ -10,6 +10,7 @@ pub type Matrix2d = nalgebra::Matrix2::<f64>;
 pub type Matrix3d = nalgebra::Matrix3::<f64>;
 pub type Matrix4d = nalgebra::Matrix4::<f64>;
 pub type Matrix23d = nalgebra::Matrix2x3::<f64>;
+pub type Matrix34d = nalgebra::Matrix3x4::<f64>;
 
 pub fn from_usize(p: Vector2usize) -> Vector2i {
   Vector2i::new(p[0] as i32, p[1] as i32)

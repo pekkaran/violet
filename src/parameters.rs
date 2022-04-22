@@ -14,6 +14,12 @@ pub struct ParameterSet {
   #[clap(long, default_value = "400")]
   pub max_tracks: usize,
 
+  // (Extended) Kalman Filter.
+  #[clap(long, default_value = "1e-3")]
+  pub kf_noise_a: f64,
+  #[clap(long, default_value = "1e-4")]
+  pub kf_noise_g: f64,
+
   // TODO Use another parameter struct with the clap flattening option?
   // Pyramidal Lucas-Kanade feature tracker.
   #[clap(long, default_value = "3")]

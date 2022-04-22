@@ -25,3 +25,7 @@ serde_json = "1"
 winit = "0.26"
 # Put pixel data in a (winit) window.
 softbuffer = "0.1"
+
+[profile.dev]
+# `nalgebra` is too slow to run without optimizations. Eigen of C++ is not any different.
+opt-level = 3
