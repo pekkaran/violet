@@ -27,6 +27,7 @@ const F_SIZE: usize = CAM0 + CAM_SIZE;
 const Q_A: usize = 0; // Accelerometer.
 const Q_G: usize = 3; // Gyroscope.
 const Q_BGA: usize = 6; // BGA drift.
+#[allow(dead_code)] // TODO Implement.
 const Q_BAA: usize = 9; // BAA drift.
 const Q_SIZE: usize = 12;
 
@@ -46,6 +47,7 @@ macro_rules! ori { ($m: expr, $ind: expr) => {
 pub struct KalmanFilter {
   last_time: Option<f64>,
   pose_trail_len: usize,
+  state_len: usize,
   m: Vectord,
   P: Matrixd,
   Q: Matrixd,
@@ -80,6 +82,7 @@ impl KalmanFilter {
     KalmanFilter {
       last_time: None,
       pose_trail_len,
+      state_len,
       m,
       P: DMatrix::zeros(state_len, state_len),
       tmpP: DMatrix::zeros(state_len, state_len),
@@ -173,15 +176,26 @@ impl KalmanFilter {
 
     self.F.fixed_slice_mut::<3, 3>(F_VEL, F_BAA).copy_from(&(-dt * R.transpose()));
 
+    // P = F*P*F' + L*Q*L'
     self.tmpP.fixed_slice_mut::<F_SIZE, F_SIZE>(0, 0)
       .copy_from(&(
           &self.F * self.P.fixed_slice::<F_SIZE, F_SIZE>(0, 0) * &self.F.transpose()
           + &self.L * &self.Q * &self.L.transpose()
       ));
-    // TODO Missing the two side blocks.
-
+    let n = self.state_len;
+    self.tmpP.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE))
+      .copy_from(&(self.P.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE)) * &self.F.transpose()));
+    self.tmpP.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))
+      .copy_from(&(&self.F * self.P.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))));
     mem::swap(&mut self.P, &mut self.tmpP);
 
-    // TODO Normalize the quaternions somewhere.
+    self.normalize_quaternions();
+  }
+
+  fn normalize_quaternions(&mut self) {
+    for i in 0..self.pose_trail_len {
+      let ori_new = ori!(self.m, i).normalize();
+      self.m.fixed_slice_mut::<4, 1>(CAM0 + CAM_ORI + i * CAM_SIZE, 0).copy_from(&ori_new);
+    }
   }
 }
