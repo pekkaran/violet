@@ -48,13 +48,30 @@ pub struct KalmanFilter {
   last_time: Option<f64>,
   pose_trail_len: usize,
   state_len: usize,
-  m: Vectord,
-  P: Matrixd,
-  Q: Matrixd,
-  tmpP: Matrixd,
-  F: Matrixd,
-  L: Matrixd,
   gravity: Vector3d,
+
+  // The notation is mostly based on <https://en.wikipedia.org/wiki/Extended_Kalman_filter>
+  // State mean. `x` in the Wikipedia article. TODO Change to `x`.
+  m: Vectord,
+  // State covariance.
+  P: Matrixd,
+  // Process noise covariance.
+  Q: Matrixd,
+  // State transition Jacobian.
+  F: Matrixd,
+  // Process noise Jacobian.
+  L: Matrixd,
+  // Pose augmentation.
+  aug_F: Matrixd,
+  aug_Q: Matrixd,
+  aug_R: Matrixd,
+  aug_H: Matrixd,
+  aug_S: Matrixd,
+  aug_S_inv: Matrixd,
+  // Temporary variables to avoid allocations. It's a bit unclear if these work
+  // in nalgebra like in Eigen.
+  tmp_m: Vectord,
+  tmp_P: Matrixd,
 }
 
 #[allow(non_snake_case)]
@@ -63,7 +80,6 @@ impl KalmanFilter {
     let p = PARAMETER_SET.lock().unwrap();
     let pose_trail_len = p.pose_trail_len;
     let state_len = CAM0 + CAM_SIZE * pose_trail_len;
-    let m = DVector::zeros(state_len);
 
     let mut F = DMatrix::zeros(F_SIZE, F_SIZE);
     F.fixed_slice_mut::<3, 3>(F_POS, F_POS).copy_from(&Matrix3d::identity());
@@ -79,17 +95,51 @@ impl KalmanFilter {
     Q.fixed_slice_mut::<3, 3>(Q_A, Q_A).copy_from(&(p.kf_noise_a.powi(2) * Matrix3d::identity()));
     Q.fixed_slice_mut::<3, 3>(Q_G, Q_G).copy_from(&(p.kf_noise_g.powi(2) * Matrix3d::identity()));
 
+    let mut aug_F = DMatrix::zeros(state_len, state_len);
+    aug_F.fixed_slice_mut::<F_SIZE, F_SIZE>(0, 0).copy_from(&(DMatrix::identity(F_SIZE, F_SIZE)));
+
+    let mut aug_Q = DMatrix::zeros(state_len, state_len);
+    // VIO should not be sensitive to these, hard-coded.
+    let aug_process_noise_position = 100.;
+    let aug_process_noise_orientation = 3.;
+    let CAM1 = CAM0 + CAM_SIZE;
+    for i in 0..3 {
+      aug_Q[(CAM1 + i, CAM1 + i)] = aug_process_noise_position;
+    }
+    for i in 0..4 {
+      aug_Q[(CAM1 + 3 + i, CAM1 + 3 + i)] = aug_process_noise_orientation;
+    }
+
+    let aug_update_noise = 1e-9; // VIO should not be sensitive to this, hard-coded.
+    let aug_R = aug_update_noise * DMatrix::identity(CAM_SIZE, CAM_SIZE);
+
+    let mut aug_H = DMatrix::zeros(CAM_SIZE, state_len);
+    for i in 0..CAM_SIZE {
+      aug_H[(i, CAM0 + i)] = 1.;
+      aug_H[(i, CAM0 + CAM_SIZE + i)] = -1.;
+    }
+
+    let aug_S = DMatrix::zeros(CAM_SIZE, CAM_SIZE);
+    let aug_S_inv = DMatrix::zeros(CAM_SIZE, CAM_SIZE);
+
     KalmanFilter {
       last_time: None,
       pose_trail_len,
       state_len,
-      m,
+      gravity: Vector3d::new(0., 0., -p.gravity),
+      m: DVector::zeros(state_len),
       P: DMatrix::zeros(state_len, state_len),
-      tmpP: DMatrix::zeros(state_len, state_len),
       Q,
       F,
       L,
-      gravity: Vector3d::new(0., 0., -p.gravity),
+      aug_F,
+      aug_Q,
+      aug_R,
+      aug_H,
+      aug_S,
+      aug_S_inv,
+      tmp_m: DVector::zeros(state_len),
+      tmp_P: DMatrix::zeros(state_len, state_len),
     }
   }
 
@@ -177,18 +227,43 @@ impl KalmanFilter {
     self.F.fixed_slice_mut::<3, 3>(F_VEL, F_BAA).copy_from(&(-dt * R.transpose()));
 
     // P = F*P*F' + L*Q*L'
-    self.tmpP.fixed_slice_mut::<F_SIZE, F_SIZE>(0, 0)
+    self.tmp_P.fixed_slice_mut::<F_SIZE, F_SIZE>(0, 0)
       .copy_from(&(
           &self.F * self.P.fixed_slice::<F_SIZE, F_SIZE>(0, 0) * &self.F.transpose()
           + &self.L * &self.Q * &self.L.transpose()
       ));
     let n = self.state_len;
-    self.tmpP.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE))
+    self.tmp_P.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE))
       .copy_from(&(self.P.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE)) * &self.F.transpose()));
-    self.tmpP.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))
+    self.tmp_P.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))
       .copy_from(&(&self.F * self.P.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))));
-    mem::swap(&mut self.P, &mut self.tmpP);
+    mem::swap(&mut self.P, &mut self.tmp_P);
 
+    self.normalize_quaternions();
+  }
+
+  pub fn augment_pose(&mut self) {
+    self.tmp_m.copy_from(&(&self.aug_F * &self.m));
+    mem::swap(&mut self.m, &mut self.tmp_m);
+
+    self.tmp_P.copy_from(&(&self.aug_F * &self.P * &self.aug_F.transpose() + &self.aug_Q));
+    mem::swap(&mut self.P, &mut self.tmp_P);
+
+    // `aug_H * P` will be computed twice.
+    self.aug_S.copy_from(&(&self.aug_R + &self.aug_H * &self.P * &self.aug_H.transpose()));
+    self.aug_S_inv.copy_from(&(&self.aug_S.clone().try_inverse().unwrap()));
+
+    // TODO Implement.
+    /*
+    K = invS.solve(HP).transpose();
+    Eigen::MatrixXd &v = tmp_P0;
+    v.noalias() = -visAugH * m;
+    m.noalias() += K * v; // m += K * (-visAugH * m)
+
+    updateCommonJosephForm(P, visAugH, R, K, tmp_P0, tmp_P1);
+    */
+
+    // TODO Check "maintainPositiveSemiDefinite()" is not needed.
     self.normalize_quaternions();
   }
 
