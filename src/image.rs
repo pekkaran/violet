@@ -1,8 +1,8 @@
 use crate::all::*;
 
 // Row-major grayscale image storage.
-// Could also have used nalebgra::DMatrix, but the added complexity
-// only seems to help with algorithms like the optical flow.
+// Could also have used nalgebra::DMatrix instead of this struct,
+// but for most uses it seemed to be unnecessarily complicated.
 #[derive(Clone)]
 pub struct Image {
   pub data: Vec<u8>,
