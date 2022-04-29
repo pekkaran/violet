@@ -66,6 +66,4 @@ cargo run -- --help
 
 ## License
 
-The license for the software is undecided for now. All rights reserved.
-
-Note that the algorithms are heavily based on [HybVIO](https://github.com/SpectacularAI/HybVIO) which is licensed under **GPL-3.0**.
+Licensed under **GPLv3**. Note that the algorithms are heavily based on [HybVIO](https://github.com/SpectacularAI/HybVIO) which is licensed under GPLv3.
