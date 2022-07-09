@@ -1,5 +1,5 @@
 use kiss3d::camera::ArcBall;
-use kiss3d::event::{Action, WindowEvent};
+use kiss3d::event::{Action, Key, WindowEvent};
 use kiss3d::window::Window;
 use nalgebra::Point3;
 
@@ -36,7 +36,8 @@ struct State {
 fn render(mut window: &mut Window, state: &mut State) {
   for event in window.events().iter() {
     match event.value {
-      WindowEvent::Key(_key, Action::Release, _) => {
+      WindowEvent::Key(key, Action::Release, _) => {
+        if key == Key::Q { window.close() }
       }
       _ => {}
     }

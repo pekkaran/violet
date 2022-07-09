@@ -83,10 +83,14 @@ fn run() -> Result<()> {
     .format(util::format_log)
     .init();
 
-  let (tx, rx) = mpsc::channel();
+  let (quit_3d_tx, quit_3d_rx) = mpsc::channel();
+  let (quit_2d_tx, quit_2d_rx) = mpsc::channel();
   let mut visualize_3d_handle = None;
   if PARAMETER_SET.lock().unwrap().show_3d {
-    visualize_3d_handle = Some(std::thread::spawn(move || run_visualize_3d(rx)));
+    visualize_3d_handle = Some(std::thread::spawn(move || {
+      run_visualize_3d(quit_3d_rx);
+      _ = quit_2d_tx.send(());
+    }));
   }
 
   let mut buffer = vec![];
@@ -104,11 +108,14 @@ fn run() -> Result<()> {
       handle_error(&err);
       *control_flow = ControlFlow::Exit;
     }
+    if let Ok(_) = quit_2d_rx.try_recv() {
+      *control_flow = ControlFlow::Exit;
+    }
   });
 
   if let Some(visualize_3d_handle) = visualize_3d_handle {
     // Signal to quit 3d visualization thread.
-    _ = tx.send(());
+    _ = quit_3d_tx.send(());
     _ = visualize_3d_handle.join();
   }
   Ok(())
