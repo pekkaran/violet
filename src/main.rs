@@ -84,7 +84,10 @@ fn run() -> Result<()> {
     .init();
 
   let (tx, rx) = mpsc::channel();
-  let visualize_3d_handle = std::thread::spawn(move || run_visualize_3d(rx));
+  let mut visualize_3d_handle = None;
+  if PARAMETER_SET.lock().unwrap().show_3d {
+    visualize_3d_handle = Some(std::thread::spawn(move || run_visualize_3d(rx)));
+  }
 
   let mut buffer = vec![];
   let mut args = EventLoopArgs {
@@ -103,7 +106,10 @@ fn run() -> Result<()> {
     }
   });
 
-  _ = tx.send(()); // Signal to quit 3d visualization thread.
-  _ = visualize_3d_handle.join();
+  if let Some(visualize_3d_handle) = visualize_3d_handle {
+    // Signal to quit 3d visualization thread.
+    _ = tx.send(());
+    _ = visualize_3d_handle.join();
+  }
   Ok(())
 }

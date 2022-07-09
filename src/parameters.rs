@@ -52,6 +52,8 @@ pub struct ParameterSet {
 
   // Visualizations.
   #[clap(long)]
+  pub show_3d: bool,
+  #[clap(long)]
   pub show_features: bool,
   #[clap(long)]
   pub show_mask: bool,
