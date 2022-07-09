@@ -56,6 +56,7 @@ impl Vio {
         self.frame_number += 1;
         if (self.frame_number - 1) % self.frame_sub == 0 {
           self.process_frame(frame)?;
+          self.update_debug_data_3d();
           return Ok(true);
         }
       },
@@ -94,10 +95,18 @@ impl Vio {
     let frame0 = self.frames.iter().rev().nth(1);
     let frame1 = self.frames.iter().last().unwrap();
     self.tracker.process(frame0, frame1, &self.cameras);
+
+    self.kalman_filter.augment_pose();
+
     Ok(())
   }
 
   fn process_imu(&mut self, time: f64, gyroscope: Vector3d, accelerometer: Vector3d) {
     self.kalman_filter.predict(time, gyroscope, accelerometer);
+  }
+
+  fn update_debug_data_3d(&self) {
+    let d = &mut DEBUG_DATA_3D.lock().unwrap();
+    self.kalman_filter.get_pose_trail(&mut d.pose_trail);
   }
 }

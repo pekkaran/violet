@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 mod all;
 mod camera;
 mod camera_pinhole;

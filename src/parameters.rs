@@ -19,6 +19,16 @@ pub struct ParameterSet {
   pub kf_noise_a: f64,
   #[clap(long, default_value = "1e-4")]
   pub kf_noise_g: f64,
+  #[clap(long, default_value = "1e-1")]
+  pub kf_noise_vel: f64,
+  #[clap(long, default_value = "1e-5")]
+  pub kf_noise_pos: f64,
+  #[clap(long, default_value = "1e-2")]
+  pub kf_noise_ori: f64,
+  #[clap(long, default_value = "1e-3")]
+  pub kf_noise_bga: f64,
+  #[clap(long, default_value = "1e-6")]
+  pub kf_noise_baa: f64,
 
   // TODO Use another parameter struct with the clap flattening option?
   // Pyramidal Lucas-Kanade feature tracker.

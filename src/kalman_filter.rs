@@ -27,7 +27,6 @@ const F_SIZE: usize = CAM0 + CAM_SIZE;
 const Q_A: usize = 0; // Accelerometer.
 const Q_G: usize = 3; // Gyroscope.
 const Q_BGA: usize = 6; // BGA drift.
-#[allow(dead_code)] // TODO Implement.
 const Q_BAA: usize = 9; // BAA drift.
 const Q_SIZE: usize = 12;
 
@@ -44,11 +43,25 @@ macro_rules! ori { ($m: expr, $ind: expr) => {
 } }
 
 #[allow(non_snake_case)]
+fn camera_to_world(pos: Vector3d, ori: Vector4d) -> Matrix4d {
+  let mut T = Matrix4d::identity();
+  // NOTE The Kalman Filter internally stores rotations as world-to-camera,
+  // even though the positions in world coordinates would make camera-to-world
+  // representation more natural.
+  T.fixed_slice_mut::<3, 3>(0, 0).copy_from(&to_rotation_matrix(ori).transpose());
+  T.fixed_slice_mut::<3, 1>(0, 3).copy_from(&pos);
+  T
+}
+
+#[allow(non_snake_case)]
 pub struct KalmanFilter {
   last_time: Option<f64>,
   pose_trail_len: usize,
   state_len: usize,
   gravity: Vector3d,
+
+  predict_count: usize,
+  augment_count: usize,
 
   // The notation is mostly based on <https://en.wikipedia.org/wiki/Extended_Kalman_filter>
   // State mean. `x` in the Wikipedia article. TODO Change to `x`.
@@ -63,11 +76,6 @@ pub struct KalmanFilter {
   L: Matrixd,
   // Pose augmentation.
   aug_F: Matrixd,
-  aug_Q: Matrixd,
-  aug_R: Matrixd,
-  aug_H: Matrixd,
-  aug_S: Matrixd,
-  aug_S_inv: Matrixd,
   // Temporary variables to avoid allocations. It's a bit unclear if these work
   // in nalgebra like in Eigen.
   tmp_m: Vectord,
@@ -81,6 +89,12 @@ impl KalmanFilter {
     let pose_trail_len = p.pose_trail_len;
     let state_len = CAM0 + CAM_SIZE * pose_trail_len;
 
+    let set_diagonal = |M: &mut Matrixd, start, len, value: f64| {
+      for i in start..(start + len) {
+        M[(i, i)] = value.powi(2);
+      }
+    };
+
     let mut F = DMatrix::zeros(F_SIZE, F_SIZE);
     F.fixed_slice_mut::<3, 3>(F_POS, F_POS).copy_from(&Matrix3d::identity());
     F.fixed_slice_mut::<3, 3>(F_VEL, F_VEL).copy_from(&Matrix3d::identity());
@@ -89,55 +103,42 @@ impl KalmanFilter {
 
     let mut L = DMatrix::zeros(F_SIZE, Q_SIZE);
     L.fixed_slice_mut::<3, 3>(F_BGA, Q_BGA).copy_from(&Matrix3d::identity());
-    L.fixed_slice_mut::<3, 3>(F_BAA, Q_BGA).copy_from(&Matrix3d::identity());
+    L.fixed_slice_mut::<3, 3>(F_BAA, Q_BAA).copy_from(&Matrix3d::identity());
 
     let mut Q = DMatrix::zeros(Q_SIZE, Q_SIZE);
-    Q.fixed_slice_mut::<3, 3>(Q_A, Q_A).copy_from(&(p.kf_noise_a.powi(2) * Matrix3d::identity()));
-    Q.fixed_slice_mut::<3, 3>(Q_G, Q_G).copy_from(&(p.kf_noise_g.powi(2) * Matrix3d::identity()));
+    set_diagonal(&mut Q, Q_A, 3, p.kf_noise_a);
+    set_diagonal(&mut Q, Q_G, 3, p.kf_noise_g);
 
     let mut aug_F = DMatrix::zeros(state_len, state_len);
+    // Do not change state before the second pose in the trail.
     aug_F.fixed_slice_mut::<F_SIZE, F_SIZE>(0, 0).copy_from(&(DMatrix::identity(F_SIZE, F_SIZE)));
-
-    let mut aug_Q = DMatrix::zeros(state_len, state_len);
-    // VIO should not be sensitive to these, hard-coded.
-    let aug_process_noise_position = 100.;
-    let aug_process_noise_orientation = 3.;
-    let CAM1 = CAM0 + CAM_SIZE;
-    for i in 0..3 {
-      aug_Q[(CAM1 + i, CAM1 + i)] = aug_process_noise_position;
-    }
-    for i in 0..4 {
-      aug_Q[(CAM1 + 3 + i, CAM1 + 3 + i)] = aug_process_noise_orientation;
+    // Shift poses so that first is copied to the second and the last one dropped.
+    for i in 0..(CAM_SIZE * (p.pose_trail_len - 1)) {
+      aug_F[(F_SIZE + i, CAM0 + i)] = 1.;
     }
 
-    let aug_update_noise = 1e-9; // VIO should not be sensitive to this, hard-coded.
-    let aug_R = aug_update_noise * DMatrix::identity(CAM_SIZE, CAM_SIZE);
-
-    let mut aug_H = DMatrix::zeros(CAM_SIZE, state_len);
-    for i in 0..CAM_SIZE {
-      aug_H[(i, CAM0 + i)] = 1.;
-      aug_H[(i, CAM0 + CAM_SIZE + i)] = -1.;
+    let mut P = DMatrix::zeros(state_len, state_len);
+    set_diagonal(&mut P, F_VEL, 3, p.kf_noise_vel);
+    set_diagonal(&mut P, F_BGA, 3, p.kf_noise_bga);
+    set_diagonal(&mut P, F_BAA, 3, p.kf_noise_baa);
+    for i in 0..p.pose_trail_len {
+      set_diagonal(&mut P, CAM0 + i * CAM_SIZE + CAM_POS, 3, p.kf_noise_pos);
+      set_diagonal(&mut P, CAM0 + i * CAM_SIZE + CAM_ORI, 4, p.kf_noise_ori);
     }
-
-    let aug_S = DMatrix::zeros(CAM_SIZE, CAM_SIZE);
-    let aug_S_inv = DMatrix::zeros(CAM_SIZE, CAM_SIZE);
 
     KalmanFilter {
       last_time: None,
       pose_trail_len,
       state_len,
       gravity: Vector3d::new(0., 0., -p.gravity),
+      predict_count: 0,
+      augment_count: 0,
       m: DVector::zeros(state_len),
-      P: DMatrix::zeros(state_len, state_len),
+      P,
       Q,
       F,
       L,
       aug_F,
-      aug_Q,
-      aug_R,
-      aug_H,
-      aug_S,
-      aug_S_inv,
       tmp_m: DVector::zeros(state_len),
       tmp_P: DMatrix::zeros(state_len, state_len),
     }
@@ -149,6 +150,10 @@ impl KalmanFilter {
     gyroscope: Vector3d,
     accelerometer: Vector3d,
   ) {
+    if ori!(self.m, 0) == Vector4d::zeros() {
+      self.initialize_orientation(accelerometer);
+    }
+
     let dt = if let Some(last_time) = self.last_time { time - last_time } else { 0. };
     self.last_time = Some(time);
     if dt <= 0. { return }
@@ -240,37 +245,65 @@ impl KalmanFilter {
     mem::swap(&mut self.P, &mut self.tmp_P);
 
     self.normalize_quaternions();
+    self.predict_count += 1;
   }
 
   pub fn augment_pose(&mut self) {
+    // Periodic check for development use.
+    self.check_nan();
+
     self.tmp_m.copy_from(&(&self.aug_F * &self.m));
     mem::swap(&mut self.m, &mut self.tmp_m);
 
-    self.tmp_P.copy_from(&(&self.aug_F * &self.P * &self.aug_F.transpose() + &self.aug_Q));
+    self.tmp_P.copy_from(&(&self.aug_F * &self.P * &self.aug_F.transpose()));
     mem::swap(&mut self.P, &mut self.tmp_P);
 
-    // `aug_H * P` will be computed twice.
-    self.aug_S.copy_from(&(&self.aug_R + &self.aug_H * &self.P * &self.aug_H.transpose()));
-    self.aug_S_inv.copy_from(&(&self.aug_S.clone().try_inverse().unwrap()));
-
-    // TODO Implement.
-    /*
-    K = invS.solve(HP).transpose();
-    Eigen::MatrixXd &v = tmp_P0;
-    v.noalias() = -visAugH * m;
-    m.noalias() += K * v; // m += K * (-visAugH * m)
-
-    updateCommonJosephForm(P, visAugH, R, K, tmp_P0, tmp_P1);
-    */
+    for i in CAM0..(CAM0 + CAM_SIZE) {
+      self.P[(i, i)] += 1e-10;
+    }
 
     // TODO Check "maintainPositiveSemiDefinite()" is not needed.
     self.normalize_quaternions();
+
+    self.augment_count += 1;
+  }
+
+  // Based on <https://math.stackexchange.com/a/2313401>.
+  fn initialize_orientation(&mut self, accelerometer: Vector3d) {
+    let u = -self.gravity;
+    let v = accelerometer;
+    let un = u.norm();
+    let vn = v.norm();
+    let n = 1. / (u * vn + un * v).norm();
+    self.m[F_ORI] = n * (un * vn + (u.transpose() * v)[(0, 0)]); // w component
+    self.m.fixed_slice_mut::<3, 1>(F_ORI + 1, 0).copy_from(&(n * u.cross(&v))); // xyz components
   }
 
   fn normalize_quaternions(&mut self) {
     for i in 0..self.pose_trail_len {
+      if ori!(self.m, i) == Vector4d::zeros() { continue }
       let ori_new = ori!(self.m, i).normalize();
       self.m.fixed_slice_mut::<4, 1>(CAM0 + CAM_ORI + i * CAM_SIZE, 0).copy_from(&ori_new);
+    }
+  }
+
+  pub fn get_pose_trail(&self, pose_trail: &mut Vec<Matrix4d>) {
+    pose_trail.clear();
+    for i in 0..self.pose_trail_len {
+      let ori = ori!(self.m, i);
+      let pos = pos!(self.m, i);
+      if ori == Vector3d::zeros() { continue }
+      pose_trail.push(camera_to_world(pos.into(), ori.into()));
+    }
+  }
+
+  #[allow(dead_code)]
+  fn check_nan(&self) {
+    for i in 0..self.state_len {
+      if self.m[i].is_nan() {
+        info!("{}: {}", i, self.m[i]);
+      }
+      assert!(!self.m[i].is_nan());
     }
   }
 }
