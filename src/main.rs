@@ -20,6 +20,7 @@ mod util;
 mod video;
 mod vio;
 mod visualize;
+mod visualize_3d;
 
 use all::*;
 
@@ -79,6 +80,9 @@ fn run() -> Result<()> {
     .format(util::format_log)
     .init();
 
+  let (tx, rx) = mpsc::channel();
+  let visualize_3d_handle = std::thread::spawn(move || run_visualize_3d(rx));
+
   let mut buffer = vec![];
   let mut args = EventLoopArgs {
     input: &mut input,
@@ -95,5 +99,8 @@ fn run() -> Result<()> {
       *control_flow = ControlFlow::Exit;
     }
   });
+
+  _ = tx.send(()); // Signal to quit 3d visualization thread.
+  _ = visualize_3d_handle.join();
   Ok(())
 }

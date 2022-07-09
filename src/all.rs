@@ -22,6 +22,7 @@ pub use crate::{
   video::*,
   vio::*,
   visualize::*,
+  visualize_3d::*,
 };
 
 pub use {
@@ -32,7 +33,7 @@ pub use {
     mem,
     ops::Index,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, mpsc},
   },
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
   log::{debug, error, info, warn, LevelFilter},
