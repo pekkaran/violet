@@ -100,7 +100,6 @@ mod tests {
   use super::*;
 
   #[test]
-  #[allow(non_snake_case)]
   fn test_pinhole() {
     let K = Matrix3d::new(
       1000., 0., 360.,

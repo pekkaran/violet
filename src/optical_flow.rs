@@ -9,7 +9,6 @@ type Range = [[i16; 2]; 2];
 
 const AVERAGE_DISTANCE_METERS: f64 = 5.;
 
-#[allow(non_snake_case)]
 pub struct OpticalFlow {
   lk_iters: usize,
   lk_levels: usize,
@@ -118,7 +117,6 @@ impl OpticalFlow {
     }
   }
 
-  #[allow(non_snake_case)]
   fn process_feature(
     &mut self,
     frame_camera0: &FrameCamera,
@@ -168,7 +166,6 @@ impl OpticalFlow {
   }
 }
 
-#[allow(non_snake_case)]
 fn image_difference(
   prev_range: Range,
   r: usize,
@@ -189,7 +186,6 @@ fn image_difference(
   Some(())
 }
 
-#[allow(non_snake_case)]
 fn flow_vector(
   G: &Matrix2d,
   Ix: &Matrixd,
@@ -208,7 +204,6 @@ fn flow_vector(
   G.try_inverse().map(|invG| invG * b)
 }
 
-#[allow(non_snake_case)]
 fn spatial_gradient(
   // For now assuming range is the same as around the source feature.
   _range: Range,

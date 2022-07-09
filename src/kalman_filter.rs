@@ -42,7 +42,6 @@ macro_rules! ori { ($m: expr, $ind: expr) => {
   $m.fixed_slice::<4, 1>(CAM0 + CAM_ORI + $ind * CAM_SIZE, 0)
 } }
 
-#[allow(non_snake_case)]
 fn camera_to_world(pos: Vector3d, ori: Vector4d) -> Matrix4d {
   let mut T = Matrix4d::identity();
   // NOTE The Kalman Filter internally stores rotations as world-to-camera,
@@ -53,7 +52,6 @@ fn camera_to_world(pos: Vector3d, ori: Vector4d) -> Matrix4d {
   T
 }
 
-#[allow(non_snake_case)]
 pub struct KalmanFilter {
   last_time: Option<f64>,
   pose_trail_len: usize,
@@ -82,7 +80,6 @@ pub struct KalmanFilter {
   tmp_P: Matrixd,
 }
 
-#[allow(non_snake_case)]
 impl KalmanFilter {
   pub fn new() -> KalmanFilter {
     let p = PARAMETER_SET.lock().unwrap();

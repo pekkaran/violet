@@ -1,3 +1,4 @@
+// For math we often want to use capital letters to denote matrices.
 #![allow(non_snake_case)]
 
 mod all;

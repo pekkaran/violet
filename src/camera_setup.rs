@@ -1,7 +1,6 @@
 use crate::all::*;
 
 #[derive(Deserialize)]
-#[allow(non_snake_case)]
 pub struct CameraSetup {
   pub focalLengthX: f64,
   pub focalLengthY: f64,
