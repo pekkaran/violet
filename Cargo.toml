@@ -14,6 +14,8 @@ lazy_static = "1.4"
 log = "0.4"
 # Logging implementation.
 env_logger = "0.9"
+# 3d graphics engine.
+kiss3d = "0.34"
 # Linear algebra library similar to Eigen (C++).
 nalgebra = "0.30"
 # Random number generation.
