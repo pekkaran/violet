@@ -31,5 +31,6 @@ impl VioInit {
 fn compute_frame_scale(images: &[&Image]) -> f64 {
   assert!(!images.is_empty());
   let i = images[0];
-  ((i.width * i.width + i.height * i.height) as f64).sqrt()
+  // Normalize so that the value is roughly 1.
+  1e-3 * ((i.width * i.width + i.height * i.height) as f64).sqrt()
 }

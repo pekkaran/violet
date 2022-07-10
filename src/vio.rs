@@ -9,6 +9,7 @@ pub struct Vio {
   // Use private fields to clarify this struct would form the main API.
   tracker: Tracker,
   kalman_filter: KalmanFilter,
+  stationary: Stationary,
   cameras: Vec<Camera>,
   frames: Vec<Frame>,
   frame_number: usize,
@@ -30,7 +31,7 @@ impl Vio {
     Ok(Vio {
       tracker: Tracker::new()?,
       kalman_filter: KalmanFilter::new(),
-      // stationary: Stationary::new(),
+      stationary: Stationary::new(frame_scale),
       cameras,
       frames: vec![],
       frame_number: 0,
@@ -107,10 +108,10 @@ impl Vio {
     let frame0 = self.frames.iter().rev().nth(1);
     let frame1 = self.frames.iter().rev().nth(0).unwrap();
     self.tracker.process(frame0, frame1, &self.cameras);
-    // Could maybe avoid unwrap() by making an initialization class that wraps
-    // `Vio`. It could also be needed for the `Camera` structs if they need to
-    // know the image boundaries.
-    // self.stationary.check(self.tracker.get_tracks(), self.frame_scale.unwrap());
+
+    if self.stationary.check(self.tracker.get_tracks()) {
+      self.kalman_filter.update_stationary();
+    }
 
     self.kalman_filter.augment_pose();
 
