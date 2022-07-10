@@ -15,6 +15,7 @@ pub use crate::{
   optical_flow::*,
   parameters::*,
   pyramid::*,
+  stationary::*,
   track::*,
   tracker::*,
   types::*,

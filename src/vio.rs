@@ -14,6 +14,9 @@ pub struct Vio {
   last_gyroscope: Option<(f64, Vector3d)>,
   last_accelerometer: Option<(f64, Vector3d)>,
   last_time: Option<f64>,
+  // A number directly proportional to pixel size of the input images, used to
+  // scale pixel operations.
+  // frame_scale: Option<f64>,
 }
 
 impl Vio {
@@ -25,6 +28,7 @@ impl Vio {
     Ok(Vio {
       tracker: Tracker::new()?,
       kalman_filter: KalmanFilter::new(),
+      // stationary: Stationary::new(),
       cameras,
       frames: vec![],
       frame_number: 0,
@@ -51,6 +55,11 @@ impl Vio {
 
     match input_data.sensor {
       InputDataSensor::Frame(ref frame) => {
+        // Additional initialization on the first frame.
+        // if self.frame_scale.is_none() {
+        //   self.frame_scale = Some(compute_frame_scale(&frame.images));
+        // }
+
         assert!(frame.images[0].width > 0 && frame.images[0].height > 0);
         assert!(frame.images[1].width > 0 && frame.images[1].height > 0);
         self.frame_number += 1;
@@ -93,8 +102,12 @@ impl Vio {
     self.frames.push(Frame::new(frame, unused_frame)?);
 
     let frame0 = self.frames.iter().rev().nth(1);
-    let frame1 = self.frames.iter().last().unwrap();
+    let frame1 = self.frames.iter().rev().nth(0).unwrap();
     self.tracker.process(frame0, frame1, &self.cameras);
+    // Could maybe avoid unwrap() by making an initialization class that wraps
+    // `Vio`. It could also be needed for the `Camera` structs if they need to
+    // know the image boundaries.
+    // self.stationary.check(self.tracker.get_tracks(), self.frame_scale.unwrap());
 
     self.kalman_filter.augment_pose();
 
@@ -109,4 +122,10 @@ impl Vio {
     let d = &mut DEBUG_DATA_3D.lock().unwrap();
     self.kalman_filter.get_pose_trail(&mut d.pose_trail);
   }
+}
+
+fn compute_frame_scale(images: &[&Image]) -> f64 {
+  assert!(!images.is_empty());
+  let i = images[0];
+  ((i.width * i.width + i.height * i.height) as f64).sqrt()
 }

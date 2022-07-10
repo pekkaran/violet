@@ -13,6 +13,8 @@ pub struct ParameterSet {
   // Tracker module.
   #[clap(long, default_value = "400")]
   pub max_tracks: usize,
+  #[clap(long, default_value = "1.")]
+  pub stationarity_threshold: f64,
 
   // (Extended) Kalman Filter.
   #[clap(long, default_value = "1e-3")]

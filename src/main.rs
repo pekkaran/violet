@@ -16,6 +16,7 @@ mod math;
 mod optical_flow;
 mod parameters;
 mod pyramid;
+mod stationary;
 mod track;
 mod tracker;
 mod types;

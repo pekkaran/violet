@@ -35,6 +35,10 @@ impl Tracker {
     })
   }
 
+  pub fn get_tracks(&self) -> &Vec<Track> {
+    &self.tracks
+  }
+
   pub fn process(
     &mut self,
     frame0: Option<&Frame>,
@@ -126,6 +130,9 @@ fn update_tracks(
     }
   }
 
+  // Remove tracks that could not be tracked, even if some may not have been
+  // used for visual updates yet. Fresh tracks are always needed to reliably
+  // estimate the current pose.
   let mut i = 0;
   while i < tracks.len() {
     if tracks[i].last_seen.0 == step.0 {
