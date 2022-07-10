@@ -22,6 +22,7 @@ pub use crate::{
   util::*,
   video::*,
   vio::*,
+  vio_init::*,
   visualize::*,
   visualize_3d::*,
 };

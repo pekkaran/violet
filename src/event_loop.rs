@@ -9,9 +9,10 @@ pub struct EventLoopArgs<'a> {
   pub input: &'a mut Input,
   pub buffer: &'a mut Vec<u32>,
   pub graphics_context: &'a mut GraphicsContext<Window>,
-  pub vio: Vio,
   pub step_mode: bool,
   pub advance: bool,
+  pub vio_init: VioInit,
+  pub vio: Option<Vio>,
 }
 
 pub fn handle_event(
@@ -69,21 +70,29 @@ pub fn handle_event(
 
   match args.input.next()? {
     Some(input_data) => {
-      let processed_frame = args.vio.process(&input_data)?;
-      if !processed_frame { return Ok(()) }
+      if args.vio.is_none() {
+        if let Some(vio_result) = args.vio_init.try_init(&input_data) {
+          args.vio = Some(vio_result?);
+        }
+      }
 
-      if let InputDataSensor::Frame(ref frame) = input_data.sensor {
-        let mut visualize_args = VisualizeArgs {
-          buffer: &mut args.buffer,
-          frames: args.vio.get_frames(),
-          video_w: frame.images[0].width,
-          video_h: frame.images[0].height,
-          buffer_w: window_width,
-          buffer_h: window_height,
-        };
-        visualize(&mut visualize_args)?;
-        args.graphics_context.window().request_redraw();
-        args.advance = false;
+      if let Some(vio) = &mut args.vio {
+        let processed_frame = vio.process(&input_data)?;
+        if !processed_frame { return Ok(()) }
+
+        if let InputDataSensor::Frame(ref frame) = input_data.sensor {
+          let mut visualize_args = VisualizeArgs {
+            buffer: &mut args.buffer,
+            frames: vio.get_frames(),
+            video_w: frame.images[0].width,
+            video_h: frame.images[0].height,
+            buffer_w: window_width,
+            buffer_h: window_height,
+          };
+          visualize(&mut visualize_args)?;
+          args.graphics_context.window().request_redraw();
+          args.advance = false;
+        }
       }
     },
     None => *control_flow = ControlFlow::Exit,

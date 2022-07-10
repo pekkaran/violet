@@ -1,3 +1,5 @@
+// The main algorithm class. Takes input data and produces pose estimates.
+
 use crate::all::*;
 
 const MAX_FRAMES_IN_MEMORY: usize = 2;
@@ -16,11 +18,11 @@ pub struct Vio {
   last_time: Option<f64>,
   // A number directly proportional to pixel size of the input images, used to
   // scale pixel operations.
-  // frame_scale: Option<f64>,
+  frame_scale: f64,
 }
 
 impl Vio {
-  pub fn new(cameras: Vec<Camera>) -> Result<Vio> {
+  pub fn new(cameras: Vec<Camera>, frame_scale: f64) -> Result<Vio> {
     let frame_sub = {
       let p = PARAMETER_SET.lock().unwrap();
       p.frame_sub
@@ -36,6 +38,7 @@ impl Vio {
       last_gyroscope: None,
       last_accelerometer: None,
       last_time: None,
+      frame_scale,
     })
   }
 
@@ -122,10 +125,4 @@ impl Vio {
     let d = &mut DEBUG_DATA_3D.lock().unwrap();
     self.kalman_filter.get_pose_trail(&mut d.pose_trail);
   }
-}
-
-fn compute_frame_scale(images: &[&Image]) -> f64 {
-  assert!(!images.is_empty());
-  let i = images[0];
-  ((i.width * i.width + i.height * i.height) as f64).sqrt()
 }

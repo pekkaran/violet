@@ -23,6 +23,7 @@ mod types;
 mod util;
 mod video;
 mod vio;
+mod vio_init;
 mod visualize;
 mod visualize_3d;
 
@@ -99,9 +100,10 @@ fn run() -> Result<()> {
     input: &mut input,
     buffer: &mut buffer,
     graphics_context: &mut graphics_context,
-    vio: Vio::new(cameras)?,
     step_mode: false,
     advance: false,
+    vio_init: VioInit::new(cameras),
+    vio: None,
   };
 
   event_loop.run_return(move |event, _, mut control_flow| {
