@@ -74,10 +74,16 @@ pub struct KalmanFilter {
   L: Matrixd,
   // Pose augmentation.
   aug_F: Matrixd,
+  // Innovation covariance.
+  S: Matrixd,
+  // (Optimal) Kalman gain.
+  K: Matrixd,
   // Temporary variables to avoid allocations. It's a bit unclear if these work
   // in nalgebra like in Eigen.
   tmp_m: Vectord,
   tmp_P: Matrixd,
+  tmp_HP: Matrixd,
+  tmp_IKH: Matrixd,
 }
 
 impl KalmanFilter {
@@ -136,11 +142,17 @@ impl KalmanFilter {
       F,
       L,
       aug_F,
+      S: DMatrix::zeros(0, 0),
+      K: DMatrix::zeros(0, 0),
       tmp_m: DVector::zeros(state_len),
       tmp_P: DMatrix::zeros(state_len, state_len),
+      tmp_HP: DMatrix::zeros(0, state_len),
+      tmp_IKH: DMatrix::zeros(state_len, state_len),
     }
   }
 
+  // Prediction step that uses a dynamic model derived from physics with a
+  // control model based on the IMU measurements.
   pub fn predict(
     &mut self,
     time: f64,
@@ -241,13 +253,12 @@ impl KalmanFilter {
       .copy_from(&(&self.F * self.P.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))));
     mem::swap(&mut self.P, &mut self.tmp_P);
 
-    self.normalize_quaternions();
     self.predict_count += 1;
   }
 
+  // Prediction step that shifts the pose trail.
   pub fn augment_pose(&mut self) {
-    // Periodic check for development use.
-    self.check_nan();
+    self.check_nan(); // Periodic check for development use.
 
     self.tmp_m.copy_from(&(&self.aug_F * &self.m));
     mem::swap(&mut self.m, &mut self.tmp_m);
@@ -255,14 +266,60 @@ impl KalmanFilter {
     self.tmp_P.copy_from(&(&self.aug_F * &self.P * &self.aug_F.transpose()));
     mem::swap(&mut self.P, &mut self.tmp_P);
 
+    // May not be necessary.
     for i in CAM0..(CAM0 + CAM_SIZE) {
       self.P[(i, i)] += 1e-10;
     }
 
+    self.augment_count += 1;
+  }
+
+  // EKF update.
+  //   H: Jacobian of the observation model `h`.
+  //   y = h(x)
+  //   R: Covariance of the observation noise.
+  fn update(&mut self, H: &Matrixd, y: &Vectord, R: &Matrixd) {
+    let ny = y.nrows(); // Measurement size.
+    let nh = H.ncols(); // (Truncated) state size.
+    let nx = self.P.ncols(); // Full state size.
+    assert_eq!(H.nrows(), ny);
+    assert_eq!(R.shape(), (ny, ny));
+    self.tmp_HP.resize_mut(ny, nx, 0.);
+    self.tmp_HP.copy_from(&(H * self.P.rows(0, nh)));
+    self.S.resize_mut(ny, ny, 0.);
+    self.S.copy_from(&(self.tmp_HP.columns(0, nh) * H.transpose() + R));
+
+    // TODO If this works, make more compact using `new_unchecked()`.
+    let inv_S = if let Some(inv_S) = nalgebra::linalg::Cholesky::new(self.S.clone()) {
+      inv_S
+    }
+    else {
+      // Can `S` be just semi positive definite, in which case we need to use
+      // LDLT decomposition instead of LLT?
+      warn!("Cholesky decomposition failed.");
+      return;
+    };
+
+    self.K.resize_mut(nx, ny, 0.);
+    self.K.copy_from(&(inv_S.solve(&self.tmp_HP).transpose()));
+
+    self.m += &self.K * y;
+
+    // (I - KH)P(I - KH)' + KRK'
+    self.tmp_IKH = Matrixd::zeros(nx, nx);
+    self.tmp_IKH.slice_mut((0, 0), (nx, nh)).copy_from(&(-&self.K * H));
+    for i in 0..nx {
+      self.tmp_IKH[(i, i)] += 1.;
+    }
+    self.tmp_P = &self.tmp_IKH * &self.P * &self.tmp_IKH.transpose() + &self.K * R * &self.K.transpose();
+    mem::swap(&mut self.P, &mut self.tmp_P);
+
     // TODO Check "maintainPositiveSemiDefinite()" is not needed.
     self.normalize_quaternions();
+  }
 
-    self.augment_count += 1;
+  pub fn update_stationary(&mut self) {
+    // TODO
   }
 
   // Based on <https://math.stackexchange.com/a/2313401>.
