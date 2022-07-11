@@ -6,6 +6,11 @@
 //   * Specifically, the predict that operates only on a part of the state: P = F*P*F' + L*Q*L'
 // * Moved the first pose next to rest of the trail in the KF state.
 // * No multiplicative accelerometer bias.
+//
+// NOTE I'm finding `nalgebra` quite unergonomic for the computations in this
+// source file. I think the issues are mostly rooted on Rust's strictness and
+// thus unavoidable in any library. One option to improve the situation would
+// be to make extensive use of macros, whose implementations should be readable.
 
 use crate::all::*;
 
@@ -67,24 +72,19 @@ pub struct KalmanFilter {
   // State covariance.
   P: Matrixd,
 
-  // TODO Move to Tmp.
-  // EKF prediction matrics:
-  // Process noise covariance.
-  Q: Matrixd,
-  // State transition `f` Jacobian.
-  F: Matrixd,
-  // Process noise Jacobian.
-  L: Matrixd,
-  // Pose augmentation.
+  // Pose augmentation (constant).
   aug_F: Matrixd,
+  // Process noise covariance (constant).
+  Q: Matrixd,
 
-  // Reused EKF matrices to avoid heap allocations.
-  // It's a bit unclear if this works in nalgebra like in Eigen.
   tmp: Tmp,
 }
 
+// Reused local variables. Helps avoid heap allocations.
+// It's a bit unclear if this works in nalgebra like in Eigen.
 struct Tmp {
-  // EKF update matrices:
+  // State transition `f` Jacobian.
+  F: Matrixd,
   // Observation model `h` Jacobian.
   H: Matrixd,
   // Innovation covariance.
@@ -94,6 +94,8 @@ struct Tmp {
   // Observation noise covariance.
   R: Matrixd,
   y: Vectord,
+  // Process noise Jacobian.
+  L: Matrixd,
 
   m: Vectord,
   P: Matrixd,
@@ -154,15 +156,15 @@ impl KalmanFilter {
       m: DVector::zeros(state_len),
       P,
       Q,
-      F,
-      L,
       aug_F,
       tmp: Tmp {
+        F,
         H: DMatrix::zeros(0, state_len),
         S: DMatrix::zeros(0, 0),
         K: DMatrix::zeros(0, 0),
         R: DMatrix::zeros(0, 0),
         y: DVector::zeros(0),
+        L,
         m: DVector::zeros(state_len),
         P: DMatrix::zeros(state_len, state_len),
         HP: DMatrix::zeros(0, state_len),
@@ -179,8 +181,17 @@ impl KalmanFilter {
     gyroscope: Vector3d,
     accelerometer: Vector3d,
   ) {
-    if ori!(self.m, 0) == Vector4d::zeros() {
-      self.initialize_orientation(accelerometer);
+    let m = &mut self.m;
+    if ori!(m, 0) == Vector4d::zeros() {
+      // Initialize orientation based on the first accelometer sample.
+      // Based on <https://math.stackexchange.com/a/2313401>.
+      let u = -self.gravity;
+      let v = accelerometer;
+      let un = u.norm();
+      let vn = v.norm();
+      let n = 1. / (u * vn + un * v).norm();
+      m[F_ORI] = n * (un * vn + (u.transpose() * v)[(0, 0)]); // w component
+      m.fixed_slice_mut::<3, 1>(F_ORI + 1, 0).copy_from(&(n * u.cross(&v))); // xyz components
     }
 
     let dt = if let Some(last_time) = self.last_time { time - last_time } else { 0. };
@@ -189,7 +200,7 @@ impl KalmanFilter {
 
     // TODO Bias random walk.
 
-    let g = gyroscope - bga!(self.m); // Unbiased gyroscope.
+    let g = gyroscope - bga!(m); // Unbiased gyroscope.
     // TODO Rename to avoid confusion with KF update S.
     let S = -0.5 * dt * Matrix4d::new(
       0., -g[0], -g[1], -g[2],
@@ -199,30 +210,32 @@ impl KalmanFilter {
     );
 
     let A = S.exp();
-    let last_q: Vector4d = ori!(self.m, 0).into(); // Clone.
+    let last_q: Vector4d = ori!(m, 0).into(); // Clone.
     let (R, dR) = to_rotation_matrix_d(last_q);
 
-    let pos_new = pos!(self.m, 0) + vel!(self.m) * dt;
-    self.m.fixed_slice_mut::<3, 1>(F_POS, 0).copy_from(&pos_new);
+    let pos_new = pos!(m, 0) + vel!(m) * dt;
+    m.fixed_slice_mut::<3, 1>(F_POS, 0).copy_from(&pos_new);
 
-    let a = accelerometer - baa!(self.m); // Unbiased accelerometer.
-    let vel_new = vel!(self.m) + (R.transpose() * a + self.gravity) * dt;
-    self.m.fixed_slice_mut::<3, 1>(F_VEL, 0).copy_from(&vel_new);
+    let a = accelerometer - baa!(m); // Unbiased accelerometer.
+    let vel_new = vel!(m) + (R.transpose() * a + self.gravity) * dt;
+    m.fixed_slice_mut::<3, 1>(F_VEL, 0).copy_from(&vel_new);
 
-    let ori_new = A * ori!(self.m, 0);
-    self.m.fixed_slice_mut::<4, 1>(F_ORI, 0).copy_from(&ori_new);
+    let ori_new = A * ori!(m, 0);
+    m.fixed_slice_mut::<4, 1>(F_ORI, 0).copy_from(&ori_new);
 
-    self.F.fixed_slice_mut::<3, 3>(F_POS, F_VEL).copy_from(&(dt * Matrix3d::identity()));
+    let F = &mut self.tmp.F;
+    F.fixed_slice_mut::<3, 3>(F_POS, F_VEL).copy_from(&(dt * Matrix3d::identity()));
 
     let mut Y = Matrix34d::zeros();
     for i in 0..4 {
       Y.fixed_slice_mut::<3, 1>(0, i).copy_from(&(dt * dR[i].transpose() * a));
     }
-    self.F.fixed_slice_mut::<3, 4>(F_VEL, F_ORI).copy_from(&(Y * A));
+    F.fixed_slice_mut::<3, 4>(F_VEL, F_ORI).copy_from(&(Y * A));
 
-    self.F.fixed_slice_mut::<4, 4>(F_ORI, F_ORI).copy_from(&A);
+    F.fixed_slice_mut::<4, 4>(F_ORI, F_ORI).copy_from(&A);
 
-    self.L.fixed_slice_mut::<3, 3>(F_VEL, Q_A).copy_from(&(dt * R.transpose()));
+    let L = &mut self.tmp.L;
+    L.fixed_slice_mut::<3, 3>(F_VEL, Q_A).copy_from(&(dt * R.transpose()));
 
     // Might be cleaner to make a constant matrix that is then multiplied by `dt` on each call.
     let dS = [
@@ -247,32 +260,33 @@ impl KalmanFilter {
     ];
 
     for i in 0..3 {
-      self.L.fixed_slice_mut::<4, 1>(F_ORI, Q_G + i).copy_from(&(A * dS[i] * last_q));
+      L.fixed_slice_mut::<4, 1>(F_ORI, Q_G + i).copy_from(&(A * dS[i] * last_q));
     }
 
-    let Z = self.F.fixed_slice::<3, 4>(F_VEL, F_ORI) * self.L.fixed_slice::<4, 3>(F_ORI, Q_G);
-    self.L.fixed_slice_mut::<3, 3>(F_VEL, Q_G).copy_from(&Z);
+    let Z = F.fixed_slice::<3, 4>(F_VEL, F_ORI) * L.fixed_slice::<4, 3>(F_ORI, Q_G);
+    L.fixed_slice_mut::<3, 3>(F_VEL, Q_G).copy_from(&Z);
 
-    let Z = -self.L.fixed_slice::<3, 3>(F_VEL, Q_G);
-    self.F.fixed_slice_mut::<3, 3>(F_VEL, F_BGA).copy_from(&Z);
+    let Z = -L.fixed_slice::<3, 3>(F_VEL, Q_G);
+    F.fixed_slice_mut::<3, 3>(F_VEL, F_BGA).copy_from(&Z);
 
-    let Z = -self.L.fixed_slice::<4, 3>(F_ORI, Q_G);
-    self.F.fixed_slice_mut::<4, 3>(F_ORI, F_BGA).copy_from(&Z);
+    let Z = -L.fixed_slice::<4, 3>(F_ORI, Q_G);
+    F.fixed_slice_mut::<4, 3>(F_ORI, F_BGA).copy_from(&Z);
 
-    self.F.fixed_slice_mut::<3, 3>(F_VEL, F_BAA).copy_from(&(-dt * R.transpose()));
+    F.fixed_slice_mut::<3, 3>(F_VEL, F_BAA).copy_from(&(-dt * R.transpose()));
 
     // P = F*P*F' + L*Q*L'
+    let P = &mut self.P;
     self.tmp.P.fixed_slice_mut::<F_SIZE, F_SIZE>(0, 0)
       .copy_from(&(
-          &self.F * self.P.fixed_slice::<F_SIZE, F_SIZE>(0, 0) * &self.F.transpose()
-          + &self.L * &self.Q * &self.L.transpose()
+          &*F * P.fixed_slice::<F_SIZE, F_SIZE>(0, 0) * &F.transpose()
+          + &*L * &self.Q * &L.transpose()
       ));
     let n = self.state_len;
     self.tmp.P.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE))
-      .copy_from(&(self.P.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE)) * &self.F.transpose()));
+      .copy_from(&(P.slice_mut((F_SIZE, 0), (n - F_SIZE, F_SIZE)) * &F.transpose()));
     self.tmp.P.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))
-      .copy_from(&(&self.F * self.P.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))));
-    mem::swap(&mut self.P, &mut self.tmp.P);
+      .copy_from(&(&*F * P.slice_mut((0, F_SIZE), (F_SIZE, n - F_SIZE))));
+    mem::swap(&mut *P, &mut self.tmp.P);
 
     self.predict_count += 1;
   }
@@ -313,17 +327,6 @@ impl KalmanFilter {
     self.tmp.R.resize_mut(3, 3, 0.);
     self.tmp.R.fixed_slice_mut::<3, 3>(0, 0).copy_from(&(r * Matrix3d::identity()));
     self.update();
-  }
-
-  // Based on <https://math.stackexchange.com/a/2313401>.
-  fn initialize_orientation(&mut self, accelerometer: Vector3d) {
-    let u = -self.gravity;
-    let v = accelerometer;
-    let un = u.norm();
-    let vn = v.norm();
-    let n = 1. / (u * vn + un * v).norm();
-    self.m[F_ORI] = n * (un * vn + (u.transpose() * v)[(0, 0)]); // w component
-    self.m.fixed_slice_mut::<3, 1>(F_ORI + 1, 0).copy_from(&(n * u.cross(&v))); // xyz components
   }
 
   fn normalize_quaternions(&mut self) {
