@@ -57,6 +57,27 @@ fn camera_to_world(pos: Vector3d, ori: Vector4d) -> Matrix4d {
   T
 }
 
+const D_OMEGA: [Matrix4d; 3] = [
+  Matrix4d::new(
+    0., 0.5, 0., 0.,
+    -0.5, 0., 0., 0.,
+    0., 0., 0., 0.5,
+    0., 0., -0.5, 0.,
+  ),
+  Matrix4d::new(
+    0., 0., 0.5, 0.,
+    0., 0., 0., -0.5,
+    -0.5, 0., 0., 0.,
+    0., 0.5, 0., 0.,
+  ),
+  Matrix4d::new(
+    0., 0., 0., 0.5,
+    0., 0., 0.5, 0.,
+    0., -0.5, 0., 0.,
+    -0.5, 0., 0., 0.,
+  ),
+];
+
 pub struct KalmanFilter {
   last_time: Option<f64>,
   pose_trail_len: usize,
@@ -235,30 +256,8 @@ impl KalmanFilter {
     let L = &mut self.tmp.L;
     L.fixed_slice_mut::<3, 3>(F_VEL, Q_A).copy_from(&(dt * R.transpose()));
 
-    // Might be cleaner to make a constant matrix that is then multiplied by `dt` on each call.
-    let dS = [
-      Matrix4d::new(
-        0., dt / 2., 0., 0.,
-        -dt / 2., 0., 0., 0.,
-        0., 0., 0., dt / 2.,
-        0., 0., -dt / 2., 0.,
-      ),
-      Matrix4d::new(
-        0., 0., dt / 2., 0.,
-        0., 0., 0., -dt / 2.,
-        -dt / 2., 0., 0., 0.,
-        0., dt / 2., 0., 0.,
-      ),
-      Matrix4d::new(
-        0., 0., 0., dt / 2.,
-        0., 0., dt / 2., 0.,
-        0., -dt / 2., 0., 0.,
-        -dt / 2., 0., 0., 0.,
-      ),
-    ];
-
     for i in 0..3 {
-      L.fixed_slice_mut::<4, 1>(F_ORI, Q_G + i).copy_from(&(Omega * dS[i] * last_q));
+      L.fixed_slice_mut::<4, 1>(F_ORI, Q_G + i).copy_from(&(dt * Omega * D_OMEGA[i] * last_q));
     }
 
     let Z = F.fixed_slice::<3, 4>(F_VEL, F_ORI) * L.fixed_slice::<4, 3>(F_ORI, Q_G);
