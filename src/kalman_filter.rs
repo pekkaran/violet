@@ -201,15 +201,13 @@ impl KalmanFilter {
     // TODO Bias random walk.
 
     let g = gyroscope - bga!(m); // Unbiased gyroscope.
-    // TODO Rename to avoid confusion with KF update S.
-    let S = -0.5 * dt * Matrix4d::new(
+
+    let Omega = (-0.5 * dt * Matrix4d::new(
       0., -g[0], -g[1], -g[2],
       g[0], 0., -g[2], g[1],
       g[1], g[2], 0., -g[0],
       g[2], -g[1], g[0], 0.,
-    );
-
-    let A = S.exp();
+    )).exp();
     let last_q: Vector4d = ori!(m, 0).into(); // Clone.
     let (R, dR) = to_rotation_matrix_d(last_q);
 
@@ -220,7 +218,7 @@ impl KalmanFilter {
     let vel_new = vel!(m) + (R.transpose() * a + self.gravity) * dt;
     m.fixed_slice_mut::<3, 1>(F_VEL, 0).copy_from(&vel_new);
 
-    let ori_new = A * ori!(m, 0);
+    let ori_new = Omega * ori!(m, 0);
     m.fixed_slice_mut::<4, 1>(F_ORI, 0).copy_from(&ori_new);
 
     let F = &mut self.tmp.F;
@@ -230,9 +228,9 @@ impl KalmanFilter {
     for i in 0..4 {
       Y.fixed_slice_mut::<3, 1>(0, i).copy_from(&(dt * dR[i].transpose() * a));
     }
-    F.fixed_slice_mut::<3, 4>(F_VEL, F_ORI).copy_from(&(Y * A));
+    F.fixed_slice_mut::<3, 4>(F_VEL, F_ORI).copy_from(&(Y * Omega));
 
-    F.fixed_slice_mut::<4, 4>(F_ORI, F_ORI).copy_from(&A);
+    F.fixed_slice_mut::<4, 4>(F_ORI, F_ORI).copy_from(&Omega);
 
     let L = &mut self.tmp.L;
     L.fixed_slice_mut::<3, 3>(F_VEL, Q_A).copy_from(&(dt * R.transpose()));
@@ -260,7 +258,7 @@ impl KalmanFilter {
     ];
 
     for i in 0..3 {
-      L.fixed_slice_mut::<4, 1>(F_ORI, Q_G + i).copy_from(&(A * dS[i] * last_q));
+      L.fixed_slice_mut::<4, 1>(F_ORI, Q_G + i).copy_from(&(Omega * dS[i] * last_q));
     }
 
     let Z = F.fixed_slice::<3, 4>(F_VEL, F_ORI) * L.fixed_slice::<4, 3>(F_ORI, Q_G);
