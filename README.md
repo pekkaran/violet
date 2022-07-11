@@ -1,6 +1,6 @@
 # Violet
 
-A toy stereo visual inertial odometry (VIO) system, based on a Kalman Filter.
+A toy stereo visual inertial odometry (VIO) system. Built upon [HybVIO](https://github.com/SpectacularAI/HybVIO), which was built upon [PIVO](https://arxiv.org/pdf/1708.00894.pdf), which was built upon [MSCKF by Mourikis and Roumeliotis](https://www-users.cse.umn.edu/~stergios/papers/ICRA07-MSCKF.pdf).
 
 ## Status
 
@@ -16,16 +16,13 @@ The implementation of the VIO is not yet complete, but some of the sub-component
   - [X] Track spatial distribution enhancement
 - [ ] Odometry: Extended Kalman Filter (EKF)
   - [X] Prediction step (the dynamic model)
-  - [ ] Update step
-  - [ ] Visual feature triangulation
+  - [X] Update step
+  - [X] Stationarity update
   - [ ] Visual update
-  - [ ] Visual update outlier detection
-  - [ ] Stationarity update
 - [X] Camera models: Pinhole with radial distortion
-- [ ] Visualizations
+- [X] Visualizations
   - [X] Various 2D visualizations
-  - [ ] VIO output track visualization, 2D
-  - [ ] VIO output track visualization, 3D
+  - [X] VIO output track visualization, 3D
 
 Goals:
 
