@@ -31,6 +31,8 @@ pub struct ParameterSet {
   pub kf_noise_bga: f64,
   #[clap(long, default_value = "1e-6")]
   pub kf_noise_baa: f64,
+  #[clap(long, default_value = "1e-7")]
+  pub kf_noise_zero_velocity: f64,
 
   // TODO Use another parameter struct with the clap flattening option?
   // Pyramidal Lucas-Kanade feature tracker.

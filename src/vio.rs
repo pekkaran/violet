@@ -20,13 +20,14 @@ pub struct Vio {
   // A number directly proportional to pixel size of the input images, used to
   // scale pixel operations.
   frame_scale: f64,
+  kf_noise_zero_velocity: f64,
 }
 
 impl Vio {
   pub fn new(cameras: Vec<Camera>, frame_scale: f64) -> Result<Vio> {
-    let frame_sub = {
+    let (frame_sub, kf_noise_zero_velocity) = {
       let p = PARAMETER_SET.lock().unwrap();
-      p.frame_sub
+      (p.frame_sub, p.kf_noise_zero_velocity)
     };
     Ok(Vio {
       tracker: Tracker::new()?,
@@ -40,6 +41,7 @@ impl Vio {
       last_accelerometer: None,
       last_time: None,
       frame_scale,
+      kf_noise_zero_velocity,
     })
   }
 
@@ -110,7 +112,7 @@ impl Vio {
     self.tracker.process(frame0, frame1, &self.cameras);
 
     if self.stationary.check(self.tracker.get_tracks()) {
-      self.kalman_filter.update_stationary();
+      self.kalman_filter.update_zero_velocity(self.kf_noise_zero_velocity);
     }
 
     self.kalman_filter.augment_pose();
