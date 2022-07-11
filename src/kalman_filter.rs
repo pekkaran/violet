@@ -1,9 +1,11 @@
-// Heavily based on:
+// Extentend Kalman Filter (EKF).
+//
+// The notation is mostly based on <https://en.wikipedia.org/wiki/Extended_Kalman_filter>
+//
+// The implementation is heavily based on:
 //   <https://github.com/SpectacularAI/HybVIO/blob/main/src/odometry/ekf.cpp>
 //
-// Some differences:
-// * Changed some notation to better match <https://en.wikipedia.org/wiki/Extended_Kalman_filter>
-//   * Specifically, the predict that operates only on a part of the state: P = F*P*F' + L*Q*L'
+// Some differences to HybVIO:
 // * Moved the first pose next to rest of the trail in the KF state.
 // * No multiplicative accelerometer bias.
 //
@@ -37,14 +39,14 @@ const Q_SIZE: usize = 12;
 
 // Note that these create references. To clone use eg:
 //   let x: VectorN = ori!().into();
-macro_rules! vel { ($m: expr) => { $m.fixed_slice::<3, 1>(F_VEL, 0) } }
-macro_rules! bga { ($m: expr) => { $m.fixed_slice::<3, 1>(F_BGA, 0) } }
-macro_rules! baa { ($m: expr) => { $m.fixed_slice::<3, 1>(F_BAA, 0) } }
-macro_rules! pos { ($m: expr, $ind: expr) => {
-  $m.fixed_slice::<3, 1>(CAM0 + CAM_POS + $ind * CAM_SIZE, 0)
+macro_rules! vel { ($x: expr) => { $x.fixed_slice::<3, 1>(F_VEL, 0) } }
+macro_rules! bga { ($x: expr) => { $x.fixed_slice::<3, 1>(F_BGA, 0) } }
+macro_rules! baa { ($x: expr) => { $x.fixed_slice::<3, 1>(F_BAA, 0) } }
+macro_rules! pos { ($x: expr, $ind: expr) => {
+  $x.fixed_slice::<3, 1>(CAM0 + CAM_POS + $ind * CAM_SIZE, 0)
 } }
-macro_rules! ori { ($m: expr, $ind: expr) => {
-  $m.fixed_slice::<4, 1>(CAM0 + CAM_ORI + $ind * CAM_SIZE, 0)
+macro_rules! ori { ($x: expr, $ind: expr) => {
+  $x.fixed_slice::<4, 1>(CAM0 + CAM_ORI + $ind * CAM_SIZE, 0)
 } }
 
 fn camera_to_world(pos: Vector3d, ori: Vector4d) -> Matrix4d {
@@ -87,9 +89,8 @@ pub struct KalmanFilter {
   predict_count: usize,
   augment_count: usize,
 
-  // The notation is mostly based on <https://en.wikipedia.org/wiki/Extended_Kalman_filter>
-  // State mean. `x` in the Wikipedia article. TODO Change to `x`.
-  m: Vectord,
+  // State mean.
+  x: Vectord,
   // State covariance.
   P: Matrixd,
 
@@ -118,7 +119,7 @@ struct Tmp {
   // Process noise Jacobian.
   L: Matrixd,
 
-  m: Vectord,
+  x: Vectord,
   P: Matrixd,
   HP: Matrixd,
   IKH: Matrixd,
@@ -130,9 +131,9 @@ impl KalmanFilter {
     let pose_trail_len = p.pose_trail_len;
     let state_len = CAM0 + CAM_SIZE * pose_trail_len;
 
-    let set_diagonal = |M: &mut Matrixd, start, len, value: f64| {
+    let set_diagonal = |x: &mut Matrixd, start, len, value: f64| {
       for i in start..(start + len) {
-        M[(i, i)] = value.powi(2);
+        x[(i, i)] = value.powi(2);
       }
     };
 
@@ -174,7 +175,7 @@ impl KalmanFilter {
       gravity: Vector3d::new(0., 0., -p.gravity),
       predict_count: 0,
       augment_count: 0,
-      m: DVector::zeros(state_len),
+      x: DVector::zeros(state_len),
       P,
       Q,
       aug_F,
@@ -186,7 +187,7 @@ impl KalmanFilter {
         R: DMatrix::zeros(0, 0),
         y: DVector::zeros(0),
         L,
-        m: DVector::zeros(state_len),
+        x: DVector::zeros(state_len),
         P: DMatrix::zeros(state_len, state_len),
         HP: DMatrix::zeros(0, state_len),
         IKH: DMatrix::zeros(state_len, state_len),
@@ -202,8 +203,8 @@ impl KalmanFilter {
     gyroscope: Vector3d,
     accelerometer: Vector3d,
   ) {
-    let m = &mut self.m;
-    if ori!(m, 0) == Vector4d::zeros() {
+    let x = &mut self.x;
+    if ori!(x, 0) == Vector4d::zeros() {
       // Initialize orientation based on the first accelometer sample.
       // Based on <https://math.stackexchange.com/a/2313401>.
       let u = -self.gravity;
@@ -211,8 +212,8 @@ impl KalmanFilter {
       let un = u.norm();
       let vn = v.norm();
       let n = 1. / (u * vn + un * v).norm();
-      m[F_ORI] = n * (un * vn + (u.transpose() * v)[(0, 0)]); // w component
-      m.fixed_slice_mut::<3, 1>(F_ORI + 1, 0).copy_from(&(n * u.cross(&v))); // xyz components
+      x[F_ORI] = n * (un * vn + (u.transpose() * v)[(0, 0)]); // w component
+      x.fixed_slice_mut::<3, 1>(F_ORI + 1, 0).copy_from(&(n * u.cross(&v))); // xyz components
     }
 
     let dt = if let Some(last_time) = self.last_time { time - last_time } else { 0. };
@@ -221,7 +222,7 @@ impl KalmanFilter {
 
     // TODO Bias random walk.
 
-    let g = gyroscope - bga!(m); // Unbiased gyroscope.
+    let g = gyroscope - bga!(x); // Unbiased gyroscope.
 
     let Omega = (-0.5 * dt * Matrix4d::new(
       0., -g[0], -g[1], -g[2],
@@ -229,18 +230,18 @@ impl KalmanFilter {
       g[1], g[2], 0., -g[0],
       g[2], -g[1], g[0], 0.,
     )).exp();
-    let last_q: Vector4d = ori!(m, 0).into(); // Clone.
+    let last_q: Vector4d = ori!(x, 0).into(); // Clone.
     let (R, dR) = to_rotation_matrix_d(last_q);
 
-    let pos_new = pos!(m, 0) + vel!(m) * dt;
-    m.fixed_slice_mut::<3, 1>(F_POS, 0).copy_from(&pos_new);
+    let pos_new = pos!(x, 0) + vel!(x) * dt;
+    x.fixed_slice_mut::<3, 1>(F_POS, 0).copy_from(&pos_new);
 
-    let a = accelerometer - baa!(m); // Unbiased accelerometer.
-    let vel_new = vel!(m) + (R.transpose() * a + self.gravity) * dt;
-    m.fixed_slice_mut::<3, 1>(F_VEL, 0).copy_from(&vel_new);
+    let a = accelerometer - baa!(x); // Unbiased accelerometer.
+    let vel_new = vel!(x) + (R.transpose() * a + self.gravity) * dt;
+    x.fixed_slice_mut::<3, 1>(F_VEL, 0).copy_from(&vel_new);
 
-    let ori_new = Omega * ori!(m, 0);
-    m.fixed_slice_mut::<4, 1>(F_ORI, 0).copy_from(&ori_new);
+    let ori_new = Omega * ori!(x, 0);
+    x.fixed_slice_mut::<4, 1>(F_ORI, 0).copy_from(&ori_new);
 
     let F = &mut self.tmp.F;
     F.fixed_slice_mut::<3, 3>(F_POS, F_VEL).copy_from(&(dt * Matrix3d::identity()));
@@ -289,7 +290,7 @@ impl KalmanFilter {
   }
 
   fn update(&mut self) {
-    update_sub(&mut self.m, &mut self.P, &mut self.tmp);
+    update_sub(&mut self.x, &mut self.P, &mut self.tmp);
     self.normalize_quaternions();
     // To help spot errors, not needed otherwise.
     self.tmp.H.resize_mut(0, 0, 0.);
@@ -301,8 +302,8 @@ impl KalmanFilter {
   pub fn augment_pose(&mut self) {
     self.check_nan(); // Periodic check for development use.
 
-    self.tmp.m.copy_from(&(&self.aug_F * &self.m));
-    mem::swap(&mut self.m, &mut self.tmp.m);
+    self.tmp.x.copy_from(&(&self.aug_F * &self.x));
+    mem::swap(&mut self.x, &mut self.tmp.x);
 
     self.tmp.P.copy_from(&(&self.aug_F * &self.P * &self.aug_F.transpose()));
     mem::swap(&mut self.P, &mut self.tmp.P);
@@ -320,7 +321,7 @@ impl KalmanFilter {
     self.tmp.H.fixed_slice_mut::<3, 3>(0, F_VEL).copy_from(&Matrix3d::identity());
     // TODO Use macro for the resize_mut + fixed_slice_mut calls.
     self.tmp.y.resize_vertically_mut(3, 0.);
-    self.tmp.y.fixed_slice_mut::<3, 1>(0, 0).copy_from(&(-vel!(self.m)));
+    self.tmp.y.fixed_slice_mut::<3, 1>(0, 0).copy_from(&(-vel!(self.x)));
     self.tmp.R.resize_mut(3, 3, 0.);
     self.tmp.R.fixed_slice_mut::<3, 3>(0, 0).copy_from(&(r * Matrix3d::identity()));
     self.update();
@@ -328,17 +329,17 @@ impl KalmanFilter {
 
   fn normalize_quaternions(&mut self) {
     for i in 0..self.pose_trail_len {
-      if ori!(self.m, i) == Vector4d::zeros() { continue }
-      let ori_new = ori!(self.m, i).normalize();
-      self.m.fixed_slice_mut::<4, 1>(CAM0 + CAM_ORI + i * CAM_SIZE, 0).copy_from(&ori_new);
+      if ori!(self.x, i) == Vector4d::zeros() { continue }
+      let ori_new = ori!(self.x, i).normalize();
+      self.x.fixed_slice_mut::<4, 1>(CAM0 + CAM_ORI + i * CAM_SIZE, 0).copy_from(&ori_new);
     }
   }
 
   pub fn get_pose_trail(&self, pose_trail: &mut Vec<Matrix4d>) {
     pose_trail.clear();
     for i in 0..self.pose_trail_len {
-      let ori = ori!(self.m, i);
-      let pos = pos!(self.m, i);
+      let ori = ori!(self.x, i);
+      let pos = pos!(self.x, i);
       if ori == Vector3d::zeros() { continue }
       pose_trail.push(camera_to_world(pos.into(), ori.into()));
     }
@@ -347,10 +348,10 @@ impl KalmanFilter {
   #[allow(dead_code)]
   fn check_nan(&self) {
     for i in 0..self.state_len {
-      if self.m[i].is_nan() {
-        info!("{}: {}", i, self.m[i]);
+      if self.x[i].is_nan() {
+        info!("{}: {}", i, self.x[i]);
       }
-      assert!(!self.m[i].is_nan());
+      assert!(!self.x[i].is_nan());
     }
   }
 }
@@ -360,7 +361,7 @@ impl KalmanFilter {
 //   y = z - h(x), where `z` is the observation measurement
 //   R: Covariance of the observation noise.
 fn update_sub(
-  m: &mut Vectord,
+  x: &mut Vectord,
   P: &mut Matrixd,
   tmp: &mut Tmp,
 ) {
@@ -389,7 +390,7 @@ fn update_sub(
   tmp.K.resize_mut(nx, ny, 0.);
   tmp.K.copy_from(&(inv_S.solve(&tmp.HP).transpose()));
 
-  *m += &tmp.K * &tmp.y;
+  *x += &tmp.K * &tmp.y;
 
   // (I - KH)P(I - KH)' + KRK'
   tmp.IKH = Matrixd::zeros(nx, nx);
