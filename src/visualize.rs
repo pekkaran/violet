@@ -146,11 +146,13 @@ pub fn visualize(args: &mut VisualizeArgs) -> Result<()> {
         let red = 255 * (length - i) / length;
         let green = 255 * i / length;
         let color = blue | ((green as u32) << 8) | ((red as u32) << 16);
+        let tp1 = &track.points[n].coordinates;
+        let tp0 = &track.points[n - 1].coordinates;
         for k in 0..2 {
           if i == 1 {
-            draw_square(args, &from_f64(track.points[n][k]) + a[k], color, 3);
+            draw_square(args, &from_f64(tp1[k]) + a[k], color, 3);
           }
-          draw_line(args, from_f64(track.points[n - 1][k]) + a[k], from_f64(track.points[n][k]) + a[k], color);
+          draw_line(args, from_f64(tp0[k]) + a[k], from_f64(tp1[k]) + a[k], color);
         }
       }
     }

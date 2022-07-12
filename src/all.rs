@@ -25,10 +25,12 @@ pub use crate::{
   vio_init::*,
   visualize::*,
   visualize_3d::*,
+  visual_update::*,
 };
 
 pub use {
   std::{
+    collections::VecDeque,
     fmt,
     fs::File,
     io::{BufRead, BufReader, Read},

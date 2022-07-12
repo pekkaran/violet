@@ -335,9 +335,9 @@ impl KalmanFilter {
     }
   }
 
-  pub fn get_pose_trail(&self, pose_trail: &mut Vec<Matrix4d>) {
+  pub fn get_pose_trail(&self, indices: &[usize], pose_trail: &mut Vec<Matrix4d>) {
     pose_trail.clear();
-    for i in 0..self.pose_trail_len {
+    for i in indices {
       let ori = ori!(self.x, i);
       let pos = pos!(self.x, i);
       if ori == Vector3d::zeros() { continue }

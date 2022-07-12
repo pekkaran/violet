@@ -26,6 +26,7 @@ mod vio;
 mod vio_init;
 mod visualize;
 mod visualize_3d;
+mod visual_update;
 
 use all::*;
 

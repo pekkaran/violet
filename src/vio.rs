@@ -10,38 +10,47 @@ pub struct Vio {
   tracker: Tracker,
   kalman_filter: KalmanFilter,
   stationary: Stationary,
+  visual_update: VisualUpdate,
   cameras: Vec<Camera>,
   frames: Vec<Frame>,
+  // Incremented just before processing a new frame. 0 before the first frame.
   frame_number: usize,
+  // Last element is the current pose. Augmentation duplicates the last element
+  // and shortens the trail is at maximum length. New frame replaces the
+  // previous last element. This logic allows to skip the augmentation easily.
+  pose_trail_frame_numbers: VecDeque<usize>,
   frame_sub: usize,
   last_gyroscope: Option<(f64, Vector3d)>,
   last_accelerometer: Option<(f64, Vector3d)>,
   last_time: Option<f64>,
-  // A number directly proportional to pixel size of the input images, used to
-  // scale pixel operations.
-  frame_scale: f64,
   kf_noise_zero_velocity: f64,
+  pose_trail_len: usize,
 }
 
 impl Vio {
   pub fn new(cameras: Vec<Camera>, frame_scale: f64) -> Result<Vio> {
-    let (frame_sub, kf_noise_zero_velocity) = {
+    let (frame_sub, kf_noise_zero_velocity, pose_trail_len) = {
       let p = PARAMETER_SET.lock().unwrap();
-      (p.frame_sub, p.kf_noise_zero_velocity)
+      (p.frame_sub, p.kf_noise_zero_velocity, p.pose_trail_len)
     };
+    let mut pose_trail_frame_numbers = VecDeque::new();
+    pose_trail_frame_numbers.push_back(0);
+
     Ok(Vio {
       tracker: Tracker::new()?,
       kalman_filter: KalmanFilter::new(),
       stationary: Stationary::new(frame_scale),
+      visual_update: VisualUpdate::new(),
       cameras,
       frames: vec![],
+      pose_trail_frame_numbers,
       frame_number: 0,
       frame_sub,
       last_gyroscope: None,
       last_accelerometer: None,
       last_time: None,
-      frame_scale,
       kf_noise_zero_velocity,
+      pose_trail_len,
     })
   }
 
@@ -61,15 +70,13 @@ impl Vio {
 
     match input_data.sensor {
       InputDataSensor::Frame(ref frame) => {
-        // Additional initialization on the first frame.
-        // if self.frame_scale.is_none() {
-        //   self.frame_scale = Some(compute_frame_scale(&frame.images));
-        // }
-
         assert!(frame.images[0].width > 0 && frame.images[0].height > 0);
         assert!(frame.images[1].width > 0 && frame.images[1].height > 0);
         self.frame_number += 1;
         if (self.frame_number - 1) % self.frame_sub == 0 {
+          self.pose_trail_frame_numbers.pop_back();
+          self.pose_trail_frame_numbers.push_back(self.frame_number);
+
           self.process_frame(frame)?;
           self.update_debug_data_3d();
           return Ok(true);
@@ -109,13 +116,24 @@ impl Vio {
 
     let frame0 = self.frames.iter().rev().nth(1);
     let frame1 = self.frames.iter().rev().nth(0).unwrap();
-    self.tracker.process(frame0, frame1, &self.cameras);
+    self.tracker.process(frame0, frame1, &self.cameras, self.frame_number);
 
     if self.stationary.check(self.tracker.get_tracks()) {
       self.kalman_filter.update_zero_velocity(self.kf_noise_zero_velocity);
     }
 
+    self.visual_update.process(
+      &mut self.kalman_filter,
+      self.tracker.get_tracks(),
+      &self.cameras,
+      &self.pose_trail_frame_numbers,
+    );
+
     self.kalman_filter.augment_pose();
+    self.pose_trail_frame_numbers.push_back(*self.pose_trail_frame_numbers.back().unwrap());
+    while self.pose_trail_frame_numbers.len() > self.pose_trail_len {
+      self.pose_trail_frame_numbers.pop_front();
+    }
 
     Ok(())
   }
@@ -125,7 +143,8 @@ impl Vio {
   }
 
   fn update_debug_data_3d(&self) {
+    let indices: Vec<_> = (0..self.pose_trail_frame_numbers.len()).collect();
     let d = &mut DEBUG_DATA_3D.lock().unwrap();
-    self.kalman_filter.get_pose_trail(&mut d.pose_trail);
+    self.kalman_filter.get_pose_trail(&indices, &mut d.pose_trail);
   }
 }

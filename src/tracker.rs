@@ -1,5 +1,6 @@
 use crate::all::*;
 
+// Could this be replaced with frame numbers?
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrackerStep(pub usize);
 
@@ -44,13 +45,14 @@ impl Tracker {
     frame0: Option<&Frame>,
     frame1: &Frame,
     cameras: &[Camera],
+    frame_number: usize,
   ) {
     if let Some(frame0) = frame0 {
       self.features1.clear();
       for track in &self.tracks {
         if track.last_seen.0 + 1 == self.step.0 {
           self.features1.push(Feature {
-            point: track.points.iter().last().unwrap()[0],
+            point: track.points.iter().last().unwrap().coordinates[0],
             id: track.id,
           });
         }
@@ -75,7 +77,7 @@ impl Tracker {
         &mut self.features1,
         &mut self.features2,
       );
-      update_tracks(&mut self.tracks, &self.features1, &self.features2, false, self.step);
+      update_tracks(&mut self.tracks, &self.features1, &self.features2, false, self.step, frame_number);
     }
 
     // TODO Make this adaptive.
@@ -100,7 +102,7 @@ impl Tracker {
       &mut self.features1,
       &mut self.features2,
     );
-    update_tracks(&mut self.tracks, &self.features1, &self.features2, true, self.step);
+    update_tracks(&mut self.tracks, &self.features1, &self.features2, true, self.step, frame_number);
 
     self.step.0 += 1
   }
@@ -112,17 +114,21 @@ fn update_tracks(
   features1: &[Feature],
   new_tracks: bool,
   step: TrackerStep,
+  frame_number: usize,
 ) {
   assert_eq!(features0.len(), features1.len());
   for (feature0, feature1) in features0.iter().zip(features1.iter()) {
     assert_eq!(feature0.id, feature1.id);
     if new_tracks {
-      tracks.push(Track::new(*feature0, *feature1, step));
+      tracks.push(Track::new(*feature0, *feature1, step, frame_number));
     }
     else {
       for track in tracks.iter_mut() {
         if track.id == feature0.id {
-          track.points.push([feature0.point, feature1.point]);
+          track.points.push(TrackPoint {
+            coordinates: [feature0.point, feature1.point],
+            frame_number,
+          });
           track.last_seen = step;
           break;
         }
@@ -158,8 +164,8 @@ fn sparsify_tracks(
     for i1 in (i0 + 1)..tracks.len() {
       if tracks[i0].points.is_empty() { continue }
       if tracks[i1].points.is_empty() { continue }
-      let p0 = tracks[i0].points.iter().last().unwrap();
-      let p1 = tracks[i1].points.iter().last().unwrap();
+      let p0 = &tracks[i0].points.iter().last().unwrap().coordinates;
+      let p1 = &tracks[i1].points.iter().last().unwrap().coordinates;
       for k in 0..2 {
         if (p0[k] - p1[k]).norm_squared() < d2 {
           assert_eq!(tracks[i0].last_seen, tracks[i1].last_seen);

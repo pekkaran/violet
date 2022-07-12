@@ -11,9 +11,16 @@ pub struct Feature {
 
 #[derive(Clone, Debug)]
 pub struct Track {
-  pub points: Vec<[Vector2d; 2]>,
+  pub points: Vec<TrackPoint>,
   pub id: TrackId,
   pub last_seen: TrackerStep,
+}
+
+#[derive(Clone, Debug)]
+pub struct TrackPoint {
+  // Pixels, not normalized.
+  pub coordinates: [Vector2d; 2],
+  pub frame_number: usize,
 }
 
 impl Track {
@@ -21,10 +28,14 @@ impl Track {
     feature0: Feature,
     feature1: Feature,
     last_seen: TrackerStep,
+    frame_number: usize,
   ) -> Track {
     assert_eq!(feature0.id, feature1.id);
     Track {
-      points: vec![[feature0.point, feature1.point]],
+      points: vec![TrackPoint {
+        coordinates: [feature0.point, feature1.point],
+        frame_number,
+      }],
       id: feature0.id,
       last_seen,
     }
