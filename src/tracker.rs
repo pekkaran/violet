@@ -77,7 +77,14 @@ impl Tracker {
         &mut self.features1,
         &mut self.features2,
       );
-      update_tracks(&mut self.tracks, &self.features1, &self.features2, false, self.step, frame_number);
+      update_tracks(
+        &mut self.tracks,
+        [&self.features1, &self.features2],
+        [&cameras[0], &cameras[1]],
+        false,
+        self.step,
+        frame_number,
+      );
     }
 
     // TODO Make this adaptive.
@@ -102,7 +109,14 @@ impl Tracker {
       &mut self.features1,
       &mut self.features2,
     );
-    update_tracks(&mut self.tracks, &self.features1, &self.features2, true, self.step, frame_number);
+    update_tracks(
+      &mut self.tracks,
+      [&self.features1, &self.features2],
+      [&cameras[0], &cameras[1]],
+      true,
+      self.step,
+      frame_number,
+    );
 
     self.step.0 += 1
   }
@@ -110,23 +124,31 @@ impl Tracker {
 
 fn update_tracks(
   tracks: &mut Vec<Track>,
-  features0: &[Feature],
-  features1: &[Feature],
+  features: [&[Feature]; 2],
+  cameras: [&Camera; 2],
   new_tracks: bool,
   step: TrackerStep,
   frame_number: usize,
 ) {
-  assert_eq!(features0.len(), features1.len());
-  for (feature0, feature1) in features0.iter().zip(features1.iter()) {
-    assert_eq!(feature0.id, feature1.id);
+  let mut update_track = |features: [Feature; 2]| {
+    // Skip tracks for which normalized coordinates cannot be computed, eg those
+    // with viewing angle 90 degrees or larger. Later parts of the VIO pipeline
+    // may require existence of normalized coordinates so it's easiest to
+    // guarantee them already here.
+    let normalized_coordinates = [
+      hnormalize(cameras[0].model.pixel_to_ray(features[0].point)?)?,
+      hnormalize(cameras[1].model.pixel_to_ray(features[1].point)?)?,
+    ];
+    assert_eq!(features[0].id, features[1].id);
     if new_tracks {
-      tracks.push(Track::new(*feature0, *feature1, step, frame_number));
+      tracks.push(Track::new(features, normalized_coordinates, step, frame_number));
     }
     else {
       for track in tracks.iter_mut() {
-        if track.id == feature0.id {
+        if track.id == features[0].id {
           track.points.push(TrackPoint {
-            coordinates: [feature0.point, feature1.point],
+            coordinates: [features[0].point, features[1].point],
+            normalized_coordinates,
             frame_number,
           });
           track.last_seen = step;
@@ -134,6 +156,12 @@ fn update_tracks(
         }
       }
     }
+    Some(())
+  };
+
+  assert_eq!(features[0].len(), features[1].len());
+  for (feature0, feature1) in features[0].iter().zip(features[1].iter()) {
+    update_track([*feature0, *feature1]);
   }
 
   // Remove tracks that could not be tracked, even if some may not have been

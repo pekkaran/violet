@@ -2,6 +2,11 @@ use crate::all::*;
 
 // The order of quaternion entries in a Vector4d is: w, x, y, z.
 
+pub fn hnormalize(p: Vector3d) -> Option<Vector2d> {
+  if p[2] < 0. { return None }
+  Some(Vector2d::new(p[0] / p[2], p[1] / p[2]))
+}
+
 pub fn to_rotation_matrix(q: Vector4d) -> Matrix3d {
   Matrix3d::new(
     q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3], 2.*q[1]*q[2] - 2.*q[0]*q[3], 2.*q[1]*q[3] + 2.*q[0]*q[2],
