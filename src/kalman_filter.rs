@@ -49,10 +49,10 @@ macro_rules! ori { ($x: expr, $ind: expr) => {
   $x.fixed_slice::<4, 1>(CAM0 + CAM_ORI + $ind * CAM_SIZE, 0)
 } }
 
-fn camera_to_world(pos: Vector3d, ori: Vector4d) -> Matrix4d {
+fn imu_to_world(pos: Vector3d, ori: Vector4d) -> Matrix4d {
   let mut T = Matrix4d::identity();
-  // NOTE The Kalman Filter internally stores rotations as world-to-camera,
-  // even though the positions in world coordinates would make camera-to-world
+  // NOTE The Kalman Filter internally stores rotations as world-to-IMU,
+  // even though the positions in world coordinates would make IMU-to-world
   // representation more natural.
   T.fixed_slice_mut::<3, 3>(0, 0).copy_from(&to_rotation_matrix(ori).transpose());
   T.fixed_slice_mut::<3, 1>(0, 3).copy_from(&pos);
@@ -79,6 +79,16 @@ const D_OMEGA: [Matrix4d; 3] = [
     -0.5, 0., 0., 0.,
   ),
 ];
+
+// Internal pose representation needed for manipulation of the derivatives for EKF
+// updates. Inherits the mixed representation.
+pub struct KalmanFilterPose {
+  // Device-to-world.
+  pub p: Vector3d,
+  // World-to-device.
+  pub R: Matrix3d,
+  pub dR_dq: [Matrix3d; 4],
+}
 
 pub struct KalmanFilter {
   last_time: Option<f64>,
@@ -231,7 +241,10 @@ impl KalmanFilter {
       g[2], -g[1], g[0], 0.,
     )).exp();
     let last_q: Vector4d = ori!(x, 0).into(); // Clone.
-    let (R, dR) = to_rotation_matrix_d(last_q);
+
+    let q_as_R = to_rotation_matrix_d(last_q);
+    let R = q_as_R.R;
+    let dR = q_as_R.dR_dq;
 
     let pos_new = pos!(x, 0) + vel!(x) * dt;
     x.fixed_slice_mut::<3, 1>(F_POS, 0).copy_from(&pos_new);
@@ -335,14 +348,50 @@ impl KalmanFilter {
     }
   }
 
-  pub fn get_pose_trail(&self, indices: &[usize], pose_trail: &mut Vec<Matrix4d>) {
-    pose_trail.clear();
+  pub fn get_imu_to_worlds(&self, indices: &[usize], imu_to_worlds: &mut Vec<Matrix4d>) {
+    imu_to_worlds.clear();
     for i in indices {
       let ori = ori!(self.x, i);
       let pos = pos!(self.x, i);
-      if ori == Vector3d::zeros() { continue }
-      pose_trail.push(camera_to_world(pos.into(), ori.into()));
+      if ori == Vector4d::zeros() { continue }
+      imu_to_worlds.push(imu_to_world(pos.into(), ori.into()));
     }
+  }
+
+  pub fn get_camera_pose_trail(
+    &self,
+    indices: &[usize],
+    cameras: [&Camera; 2],
+    poses: &mut Vec<[KalmanFilterPose; 2]>,
+  ) -> bool {
+    let transform = |A: &KalmanFilterPose, q, imu_to_camera| {
+      let imu_to_world = imu_to_world(A.p, q);
+      let camera_to_world = imu_to_world * affine_inverse(imu_to_camera);
+      let world_to_camera = affine_inverse(camera_to_world);
+      KalmanFilterPose {
+        p: position!(camera_to_world).into(),
+        R: rotation!(world_to_camera).into(),
+        dR_dq: A.dR_dq.map(|dR_dqi| rotation!(world_to_camera) * dR_dqi),
+      }
+    };
+
+    poses.clear();
+    for i in indices {
+      let q = ori!(self.x, i).into();
+      let p = pos!(self.x, i).into();
+      if q == Vector4d::zeros() { return false }
+      let q_as_R = to_rotation_matrix_d(q);
+      let imu_pose = KalmanFilterPose {
+        p,
+        R: q_as_R.R,
+        dR_dq: q_as_R.dR_dq,
+      };
+      poses.push([
+        transform(&imu_pose, q, cameras[0].imu_to_camera),
+        transform(&imu_pose, q, cameras[1].imu_to_camera),
+      ]);
+    }
+    true
   }
 
   #[allow(dead_code)]

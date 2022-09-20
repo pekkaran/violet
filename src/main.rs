@@ -1,6 +1,8 @@
 // For math we often want to use capital letters to denote matrices.
 #![allow(non_snake_case)]
 
+#[macro_use] mod math;
+
 mod all;
 mod camera;
 mod camera_pinhole;
@@ -12,7 +14,6 @@ mod frame;
 mod image;
 mod input;
 mod kalman_filter;
-mod math;
 mod optical_flow;
 mod parameters;
 mod pyramid;

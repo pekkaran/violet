@@ -125,7 +125,7 @@ impl Vio {
     self.visual_update.process(
       &mut self.kalman_filter,
       self.tracker.get_tracks(),
-      &self.cameras,
+      [&self.cameras[0], &self.cameras[1]],
       &self.pose_trail_frame_numbers,
     );
 
@@ -145,6 +145,6 @@ impl Vio {
   fn update_debug_data_3d(&self) {
     let indices: Vec<_> = (0..self.pose_trail_frame_numbers.len()).collect();
     let d = &mut DEBUG_DATA_3D.lock().unwrap();
-    self.kalman_filter.get_pose_trail(&indices, &mut d.pose_trail);
+    self.kalman_filter.get_imu_to_worlds(&indices, &mut d.pose_trail);
   }
 }
