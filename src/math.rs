@@ -12,8 +12,10 @@ pub fn affine_transform(M: Matrix4d, p: Vector3d) -> Vector3d {
 }
 
 pub fn affine_inverse(M: Matrix4d) -> Matrix4d {
-  // TODO Use the faster way to compute with transpose.
-  M.try_inverse().unwrap()
+  let mut T = Matrix4d::identity();
+  T.fixed_slice_mut::<3, 3>(0, 0).copy_from(&(rotation!(M).transpose()));
+  T.fixed_slice_mut::<3, 1>(0, 3).copy_from(&(-rotation!(M).transpose() * position!(M)));
+  T
 }
 
 pub fn hnormalize(p: Vector3d) -> Option<Vector2d> {
