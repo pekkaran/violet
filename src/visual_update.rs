@@ -66,6 +66,10 @@ impl VisualUpdate {
         continue;
       }
 
+      if is_behind_camera(self.tmp.triangulate_output.a, &self.tmp.kalman_filter_poses) {
+        continue;
+      }
+
       // TODO Do the visual update.
     }
   }
@@ -158,4 +162,19 @@ fn triangulate(
   }
 
   Some(())
+}
+
+fn is_behind_camera(
+  a: Vector3d,
+  kalman_filter_poses: &[[KalmanFilterPose; 2]],
+) -> bool {
+  for i in 0..kalman_filter_poses.len() {
+    for j in 0..2 {
+      let pose = &kalman_filter_poses[i][j];
+      let world_to_camera = affine_inverse(pose.camera_to_world);
+      let p = affine_transform(world_to_camera, a);
+      if p[2] <= 0. { return false }
+    }
+  }
+  true
 }

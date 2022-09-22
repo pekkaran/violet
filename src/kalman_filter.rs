@@ -88,6 +88,8 @@ pub struct KalmanFilterPose {
   // World-to-device.
   pub R: Matrix3d,
   pub dR_dq: [Matrix3d; 4],
+  // For convenience.
+  pub camera_to_world: Matrix4d,
 }
 
 pub struct KalmanFilter {
@@ -369,6 +371,7 @@ impl KalmanFilter {
       let camera_to_world = imu_to_world * affine_inverse(imu_to_camera);
       let world_to_camera = affine_inverse(camera_to_world);
       KalmanFilterPose {
+        camera_to_world: camera_to_world,
         p: position!(camera_to_world).into(),
         R: rotation!(world_to_camera).into(),
         dR_dq: A.dR_dq.map(|dR_dqi| rotation!(world_to_camera) * dR_dqi),
@@ -382,6 +385,7 @@ impl KalmanFilter {
       if q == Vector4d::zeros() { return false }
       let q_as_R = to_rotation_matrix_d(q);
       let imu_pose = KalmanFilterPose {
+        camera_to_world: Matrix4d::zeros(),
         p,
         R: q_as_R.R,
         dR_dq: q_as_R.dR_dq,
