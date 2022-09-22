@@ -4,7 +4,7 @@ use crate::all::*;
 
 // Affine transformation matrices.
 macro_rules! rotation { ($x: expr) => { $x.fixed_slice::<3, 3>(0, 0) } }
-macro_rules! position { ($x: expr) => { $x.fixed_slice::<3, 1>(3, 0) } }
+macro_rules! position { ($x: expr) => { $x.fixed_slice::<3, 1>(0, 3) } }
 
 #[allow(dead_code)]
 pub fn affine_transform(M: Matrix4d, p: Vector3d) -> Vector3d {

@@ -57,12 +57,11 @@ impl VisualUpdate {
         if i >= pose_trail_frame_numbers.len() { break }
       }
 
-      // TODO Crashes.
-      // let success = kalman_filter.get_camera_pose_trail(
-      //   &self.tmp.indices,
-      //   cameras,
-      //   &mut self.tmp.kalman_filter_poses,
-      // );
+      let success = kalman_filter.get_camera_pose_trail(
+        &self.tmp.indices,
+        cameras,
+        &mut self.tmp.kalman_filter_poses,
+      );
       let success = false;
 
       // TODO The assert shouldn't fail, the above logic probably doesn't
