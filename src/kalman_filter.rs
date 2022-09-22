@@ -207,6 +207,18 @@ impl KalmanFilter {
     }
   }
 
+  pub fn get_camera_state_len(&self) -> usize {
+    CAM_SIZE * self.pose_trail_len
+  }
+
+  pub fn get_camera_pos_ind(&self, i: usize) -> usize {
+    CAM0 + CAM_POS + i * CAM_SIZE
+  }
+
+  pub fn get_camera_ori_ind(&self, i: usize) -> usize {
+    CAM0 + CAM_ORI + i * CAM_SIZE
+  }
+
   // Prediction step that uses a dynamic model derived from physics with a
   // control model based on the IMU measurements.
   pub fn predict(

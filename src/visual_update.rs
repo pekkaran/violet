@@ -9,6 +9,12 @@ struct Tmp {
   indices: Vec<usize>,
   normalized_coordinates: Vec<[Vector2d; 2]>,
   triangulate_output: TriangulateOutput,
+  // EKF measurement function Jacobian.
+  H: Matrixd,
+  // Stacked triangulated and reprojected features. `h(x)` in EKF update.
+  y: Vectord,
+  // Stacked measured features.
+  z: Vectord,
 }
 
 impl VisualUpdate {
@@ -23,6 +29,9 @@ impl VisualUpdate {
           da_dp: vec![],
           da_dq: vec![],
         },
+        H: Matrixd::zeros(0, 0),
+        y: Vectord::zeros(0),
+        z: Vectord::zeros(0),
       },
     }
   }
@@ -34,6 +43,7 @@ impl VisualUpdate {
     cameras: [&Camera; 2],
     pose_trail_frame_numbers: &VecDeque<usize>,
   ) {
+    'track:
     for track in tracks {
       self.tmp.indices.clear();
       self.tmp.normalized_coordinates.clear();
@@ -66,12 +76,74 @@ impl VisualUpdate {
         continue;
       }
 
-      if is_behind_camera(self.tmp.triangulate_output.a, &self.tmp.kalman_filter_poses) {
-        continue;
-      }
+      // The visual update is defined by the measurement function `h()`
+      // operating on the EKF state `x` as:
+      //   h_i(x) = hnormalize(pose_i.R * (aw - pose_i.p)),
+      // where
+      //   aw = triangulate(x)
+      // is given in world coordinates.
+      //
+      // As part of the triangulation we have computed all derivatives of `aw`
+      // and it remains to differentiate `h_i(x)` for all poses k. The result
+      // depends on if i == k.
+      //
+      // As an example, to compute the position derivatives:
+      // d_{k_p}h_i(x) = d_hnormalize * [
+      //   d_{k_p}(pose_i.R) * (aw - pose_i.p)
+      //   + pose_i.R * d_{k_p}(aw - pose_i.p)
+      // ]
+      // = d_hnormalized * pose_i.R * d_{k_p}(aw - pose_i.p)
+      let n = self.tmp.kalman_filter_poses.len();
+      self.tmp.y.resize_vertically_mut(2 * n, 0.);
+      self.tmp.z.resize_vertically_mut(2 * n, 0.);
+      self.tmp.H.resize_mut(2 * n, kalman_filter.get_camera_state_len(), 0.);
+      for i in 0..n {
+        for j in 0..2 {
+          let row = 2 * i + j;
+          let aw = self.tmp.triangulate_output.a;
+          let pose = &self.tmp.kalman_filter_poses[i][j];
+          // let wcp = position!(world_to_camera); // TODO This is not needed, right?
+          // We decompose this for clarity with the derivatives but it's the same as:
+          //   let ac = affine_transform(world_to_camera, aw); // TODO Verify.
+          let ac = pose.R * (aw - pose.p);
 
-      // TODO Do the visual update.
-    }
+          // Check the triangulated point is in front of all cameras.
+          if ac[2] <= 0. { continue 'track; }
+
+          // Compute normalized coordinates ("project" the triangulated point).
+          let normalized_ac = hnormalize(ac).unwrap();
+          let mut d_normalized_ac = Matrix23d::zeros();
+          d_normalized_ac[(0, 0)] = 1. / ac[2];
+          d_normalized_ac[(1, 1)] = 1. / ac[2];
+          d_normalized_ac[(0, 2)] = -ac[0] / ac[2];
+          d_normalized_ac[(1, 2)] = -ac[1] / ac[2];
+
+          self.tmp.y[row + 0] = normalized_ac[0];
+          self.tmp.y[row + 1] = normalized_ac[1];
+
+          // This is the contribution to the derivatives in the case
+          // i == k. Using again the position as example and ignoring the `aw` term:
+          //   d_{i_p}h_i(x) = d_hnormalized * pose_i.R * d_{i_p}(aw - pose_i.p)
+          //   -> d_hormalized * pose_i.R * (-I)
+          let col_pos = kalman_filter.get_camera_pos_ind(i);
+          let col_ori = kalman_filter.get_camera_ori_ind(i);
+          self.tmp.H.fixed_slice_mut::<2, 3>(row, col_pos).copy_from(&(-d_normalized_ac * pose.R));
+          for m in 0..4 {
+            self.tmp.H.fixed_slice_mut::<2, 1>(row, col_ori + m).copy_from(&(
+              d_normalized_ac * pose.dR_dq[m] * (aw - pose.p)
+            ));
+          }
+
+          // TODO The triangulation derivative terms.
+
+        } // for j in 0..2
+      } // for i in 0..n
+
+    // TODO Construct `z`.
+    // TODO Outlier check.
+    // TODO EKF Update.
+
+    } // process()
   }
 }
 
@@ -162,19 +234,4 @@ fn triangulate(
   }
 
   Some(())
-}
-
-fn is_behind_camera(
-  a: Vector3d,
-  kalman_filter_poses: &[[KalmanFilterPose; 2]],
-) -> bool {
-  for i in 0..kalman_filter_poses.len() {
-    for j in 0..2 {
-      let pose = &kalman_filter_poses[i][j];
-      let world_to_camera = affine_inverse(pose.camera_to_world);
-      let p = affine_transform(world_to_camera, a);
-      if p[2] <= 0. { return false }
-    }
-  }
-  true
 }
