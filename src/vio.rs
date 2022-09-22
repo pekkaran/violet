@@ -20,6 +20,7 @@ pub struct Vio {
   // previous last element. This logic allows to skip the augmentation easily.
   pose_trail_frame_numbers: VecDeque<usize>,
   frame_sub: usize,
+  initialized_orientation: bool,
   last_gyroscope: Option<(f64, Vector3d)>,
   last_accelerometer: Option<(f64, Vector3d)>,
   last_time: Option<f64>,
@@ -46,6 +47,7 @@ impl Vio {
       pose_trail_frame_numbers,
       frame_number: 0,
       frame_sub,
+      initialized_orientation: false,
       last_gyroscope: None,
       last_accelerometer: None,
       last_time: None,
@@ -70,6 +72,9 @@ impl Vio {
 
     match input_data.sensor {
       InputDataSensor::Frame(ref frame) => {
+        // Processing must begin with a predict step to compute initial orientation.
+        if !self.initialized_orientation { return Ok(false) }
+
         assert!(frame.images[0].width > 0 && frame.images[0].height > 0);
         assert!(frame.images[1].width > 0 && frame.images[1].height > 0);
         self.frame_number += 1;
@@ -99,7 +104,9 @@ impl Vio {
     {
       if time_a >= time_g {
         self.process_imu(time_g, gyroscope, accelerometer);
+        self.initialized_orientation = true;
         self.last_gyroscope = None;
+        // Allow reuse of accelerometer samples.
       }
     }
     Ok(false)

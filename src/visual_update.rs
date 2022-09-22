@@ -1,7 +1,6 @@
 use crate::all::*;
 
 pub struct VisualUpdate {
-  pose_trail_len: usize,
   tmp: Tmp,
 }
 
@@ -14,12 +13,7 @@ struct Tmp {
 
 impl VisualUpdate {
   pub fn new() -> VisualUpdate {
-    let pose_trail_len = {
-      let p = PARAMETER_SET.lock().unwrap();
-      p.pose_trail_len
-    };
     VisualUpdate {
-      pose_trail_len,
       tmp: Tmp {
         kalman_filter_poses: vec![],
         indices: vec![],
@@ -51,7 +45,7 @@ impl VisualUpdate {
         }
         if pose_trail_frame_numbers[i] == point.frame_number {
           // In the Kalman Filter state the newest pose is first: reverse indices.
-          self.tmp.indices.push(self.pose_trail_len - i - 1);
+          self.tmp.indices.push(pose_trail_frame_numbers.len() - i - 1);
           self.tmp.normalized_coordinates.push(point.normalized_coordinates);
         }
         if i >= pose_trail_frame_numbers.len() { break }
@@ -62,11 +56,6 @@ impl VisualUpdate {
         cameras,
         &mut self.tmp.kalman_filter_poses,
       );
-      let success = false;
-
-      // TODO The assert shouldn't fail, the above logic probably doesn't
-      // correctly check if KF poses are usable.
-      if !success { continue }
       assert!(success);
 
       if triangulate(
