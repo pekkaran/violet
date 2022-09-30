@@ -1,6 +1,7 @@
 use crate::all::*;
 
 pub struct VisualUpdate {
+  kf_noise_visual: f64,
   tmp: Tmp,
 }
 
@@ -11,15 +12,16 @@ struct Tmp {
   triangulate_output: TriangulateOutput,
   // EKF measurement function Jacobian.
   H: Matrixd,
-  // Stacked triangulated and reprojected features. `h(x)` in EKF update.
+  // Stacked measured features minus stacked triangulated and reprojected features.
+  // `z - h(x)` in EKF update.
   y: Vectord,
-  // Stacked measured features.
-  z: Vectord,
 }
 
 impl VisualUpdate {
   pub fn new() -> VisualUpdate {
+    let p = PARAMETER_SET.lock().unwrap();
     VisualUpdate {
+      kf_noise_visual: p.kf_noise_visual,
       tmp: Tmp {
         kalman_filter_poses: vec![],
         indices: vec![],
@@ -31,7 +33,6 @@ impl VisualUpdate {
         },
         H: Matrixd::zeros(0, 0),
         y: Vectord::zeros(0),
-        z: Vectord::zeros(0),
       },
     }
   }
@@ -94,12 +95,12 @@ impl VisualUpdate {
       // ]
       // = d_hnormalized * pose_i.R * d_{k_p}(aw - pose_i.p)
       let n = self.tmp.kalman_filter_poses.len();
-      self.tmp.y.resize_vertically_mut(2 * n, 0.);
-      self.tmp.z.resize_vertically_mut(2 * n, 0.);
-      self.tmp.H.resize_mut(2 * n, kalman_filter.get_camera_state_len(), 0.);
+      self.tmp.H.resize_mut(4 * n, kalman_filter.get_state_len(), 0.);
+      self.tmp.y.resize_vertically_mut(4 * n, 0.);
+
       for i in 0..n {
         for j in 0..2 {
-          let row = 2 * i + j;
+          let row = 2 * (2 * i + j);
           let aw = self.tmp.triangulate_output.a;
           let pose = &self.tmp.kalman_filter_poses[i][j];
           // let wcp = position!(world_to_camera); // TODO This is not needed, right?
@@ -118,8 +119,8 @@ impl VisualUpdate {
           d_normalized_ac[(0, 2)] = -ac[0] / ac[2];
           d_normalized_ac[(1, 2)] = -ac[1] / ac[2];
 
-          self.tmp.y[row + 0] = normalized_ac[0];
-          self.tmp.y[row + 1] = normalized_ac[1];
+          self.tmp.y[row + 0] = self.tmp.normalized_coordinates[i][j][0] - normalized_ac[0];
+          self.tmp.y[row + 1] = self.tmp.normalized_coordinates[i][j][1] - normalized_ac[1];
 
           // This is the contribution to the derivatives in the case
           // i == k. Using again the position as example and ignoring the `aw` term:
@@ -134,15 +135,24 @@ impl VisualUpdate {
             ));
           }
 
-          // TODO The triangulation derivative terms.
-
+          for k in 0..n {
+            let col_pos_k = kalman_filter.get_camera_pos_ind(k);
+            let col_ori_k = kalman_filter.get_camera_ori_ind(k);
+            let da_dp = &self.tmp.triangulate_output.da_dp;
+            let da_dq = &self.tmp.triangulate_output.da_dq;
+            let mut pos = self.tmp.H.fixed_slice_mut::<2, 3>(row, col_pos_k);
+            pos += d_normalized_ac * pose.R * da_dp[k];
+            let mut ori = self.tmp.H.fixed_slice_mut::<2, 4>(row, col_ori_k);
+            ori += d_normalized_ac * pose.R * da_dq[k];
+          }
         } // for j in 0..2
       } // for i in 0..n
 
-    // TODO Construct `z`.
-    // TODO Outlier check.
-    // TODO EKF Update.
-
+    kalman_filter.update_visual(
+      &self.tmp.H,
+      &self.tmp.y,
+      self.kf_noise_visual,
+    );
     } // process()
   }
 }

@@ -112,6 +112,7 @@ pub struct KalmanFilter {
   Q: Matrixd,
 
   tmp: Tmp,
+  tmp_update: TmpUpdate,
 }
 
 // Reused local variables. Helps avoid heap allocations.
@@ -119,15 +120,10 @@ pub struct KalmanFilter {
 struct Tmp {
   // State transition `f` Jacobian.
   F: Matrixd,
-  // Observation model `h` Jacobian.
-  H: Matrixd,
   // Innovation covariance.
   S: Matrixd,
   // (Optimal) Kalman gain.
   K: Matrixd,
-  // Observation noise covariance.
-  R: Matrixd,
-  y: Vectord,
   // Process noise Jacobian.
   L: Matrixd,
 
@@ -135,6 +131,16 @@ struct Tmp {
   P: Matrixd,
   HP: Matrixd,
   IKH: Matrixd,
+}
+
+// Split from `Tmp` because of borrowing restrictions.
+struct TmpUpdate {
+  // Observation model `h` Jacobian.
+  H: Matrixd,
+  // Measurement residual.
+  y: Vectord,
+  // Observation noise covariance.
+  R: Matrixd,
 }
 
 impl KalmanFilter {
@@ -193,20 +199,27 @@ impl KalmanFilter {
       aug_F,
       tmp: Tmp {
         F,
-        H: DMatrix::zeros(0, state_len),
         S: DMatrix::zeros(0, 0),
         K: DMatrix::zeros(0, 0),
-        R: DMatrix::zeros(0, 0),
-        y: DVector::zeros(0),
         L,
         x: DVector::zeros(state_len),
         P: DMatrix::zeros(state_len, state_len),
         HP: DMatrix::zeros(0, state_len),
         IKH: DMatrix::zeros(state_len, state_len),
       },
+      tmp_update: TmpUpdate {
+        H: DMatrix::zeros(0, state_len),
+        y: DVector::zeros(0),
+        R: DMatrix::zeros(0, 0),
+      },
     }
   }
 
+  pub fn get_state_len(&self) -> usize {
+    self.state_len
+  }
+
+  #[allow(dead_code)]
   pub fn get_camera_state_len(&self) -> usize {
     CAM_SIZE * self.pose_trail_len
   }
@@ -316,15 +329,6 @@ impl KalmanFilter {
     self.predict_count += 1;
   }
 
-  fn update(&mut self) {
-    update_sub(&mut self.x, &mut self.P, &mut self.tmp);
-    self.normalize_quaternions();
-    // To help spot errors, not needed otherwise.
-    self.tmp.H.resize_mut(0, 0, 0.);
-    self.tmp.R.resize_mut(0, 0, 0.);
-    self.tmp.y.resize_vertically_mut(0, 0.);
-  }
-
   // Prediction step that shifts the pose trail.
   pub fn augment_pose(&mut self) {
     self.check_nan(); // Periodic check for development use.
@@ -343,18 +347,41 @@ impl KalmanFilter {
     self.augment_count += 1;
   }
 
-  pub fn update_zero_velocity(&mut self, r: f64) {
-    self.tmp.H.resize_mut(3, F_VEL + 3, 0.);
-    self.tmp.H.fixed_slice_mut::<3, 3>(0, F_VEL).copy_from(&Matrix3d::identity());
-    // TODO Use macro for the resize_mut + fixed_slice_mut calls.
-    self.tmp.y.resize_vertically_mut(3, 0.);
-    self.tmp.y.fixed_slice_mut::<3, 1>(0, 0).copy_from(&(-vel!(self.x)));
-    self.tmp.R.resize_mut(3, 3, 0.);
-    self.tmp.R.fixed_slice_mut::<3, 3>(0, 0).copy_from(&(r * Matrix3d::identity()));
-    self.update();
+  pub fn update_visual(
+    &mut self,
+    H: &Matrixd,
+    y: &Vectord,
+    r: f64,
+  ) {
+    let n = H.nrows();
+    self.tmp_update.R = r.powi(2) * Matrixd::identity(n, n);
+    // TODO Outlier check.
+
+    update(&mut self.x, &mut self.P, H, y, &self.tmp_update.R, &mut self.tmp);
+    info!("update");
+    self.normalize_quaternions();
   }
 
-  fn normalize_quaternions(&mut self) {
+  pub fn update_zero_velocity(&mut self, r: f64) {
+    self.tmp_update.H.resize_mut(3, F_VEL + 3, 0.);
+    self.tmp_update.H.fixed_slice_mut::<3, 3>(0, F_VEL).copy_from(&Matrix3d::identity());
+    // TODO Use macro for the resize_mut + fixed_slice_mut calls.
+    self.tmp_update.y.resize_vertically_mut(3, 0.);
+    self.tmp_update.y.fixed_slice_mut::<3, 1>(0, 0).copy_from(&(-vel!(self.x)));
+    self.tmp_update.R.resize_mut(3, 3, 0.);
+    self.tmp_update.R.fixed_slice_mut::<3, 3>(0, 0).copy_from(&(r.powi(2) * Matrix3d::identity()));
+    update(
+      &mut self.x,
+      &mut self.P,
+      &self.tmp_update.H,
+      &self.tmp_update.y,
+      &self.tmp_update.R,
+      &mut self.tmp,
+    );
+    self.normalize_quaternions();
+  }
+
+  pub fn normalize_quaternions(&mut self) {
     for i in 0..self.pose_trail_len {
       if ori!(self.x, i) == Vector4d::zeros() { continue }
       let ori_new = ori!(self.x, i).normalize();
@@ -421,25 +448,27 @@ impl KalmanFilter {
   }
 }
 
-// EKF update. Before calling this, awkwardly, you need to set the matrices H, y, R.
+// EKF update.
 //   H: Jacobian of the observation model `h`.
 //   y = z - h(x), where `z` is the observation measurement
 //   R: Covariance of the observation noise.
-fn update_sub(
+fn update(
   x: &mut Vectord,
   P: &mut Matrixd,
+  H: &Matrixd,
+  y: &Vectord,
+  R: &Matrixd,
   tmp: &mut Tmp,
 ) {
-  // TODO Take aliases to `tmp`.
-  let ny = tmp.y.nrows(); // Measurement size.
-  let nh = tmp.H.ncols(); // (Truncated) state size.
+  let ny = y.nrows(); // Measurement size.
+  let nh = H.ncols(); // (Truncated) state size.
   let nx = tmp.P.ncols(); // Full state size.
-  assert_eq!(tmp.H.nrows(), ny);
-  assert_eq!(tmp.R.shape(), (ny, ny));
+  assert_eq!(H.nrows(), ny);
+  assert_eq!(R.shape(), (ny, ny));
   tmp.HP.resize_mut(ny, nx, 0.);
-  tmp.HP.copy_from(&(&tmp.H * P.rows(0, nh)));
+  tmp.HP.copy_from(&(H * P.rows(0, nh)));
   tmp.S.resize_mut(ny, ny, 0.);
-  tmp.S.copy_from(&(tmp.HP.columns(0, nh) * tmp.H.transpose() + &tmp.R));
+  tmp.S.copy_from(&(tmp.HP.columns(0, nh) * H.transpose() + R));
 
   // TODO If this works, make more compact using `new_unchecked()`.
   let inv_S = if let Some(inv_S) = nalgebra::linalg::Cholesky::new(tmp.S.clone()) {
@@ -455,15 +484,15 @@ fn update_sub(
   tmp.K.resize_mut(nx, ny, 0.);
   tmp.K.copy_from(&(inv_S.solve(&tmp.HP).transpose()));
 
-  *x += &tmp.K * &tmp.y;
+  *x += &tmp.K * y;
 
   // (I - KH)P(I - KH)' + KRK'
   tmp.IKH = Matrixd::zeros(nx, nx);
-  tmp.IKH.slice_mut((0, 0), (nx, nh)).copy_from(&(-&tmp.K * &tmp.H));
+  tmp.IKH.slice_mut((0, 0), (nx, nh)).copy_from(&(-&tmp.K * H));
   for i in 0..nx {
     tmp.IKH[(i, i)] += 1.;
   }
   // TODO needs to be copy_from()?
-  tmp.P = &tmp.IKH * &*P * &tmp.IKH.transpose() + &tmp.K * &tmp.R * &tmp.K.transpose();
+  tmp.P = &tmp.IKH * &*P * &tmp.IKH.transpose() + &tmp.K * R * &tmp.K.transpose();
   mem::swap(&mut *P, &mut tmp.P);
 }
