@@ -40,10 +40,9 @@ Non-goals:
 
 The input data format supported by the VIO is the same as described [here](https://github.com/AaltoML/vio_benchmark#benchmark-data-format), except that the calibration is read from a JSON format. A conversion for the [EuRoC](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) dataset exists:
 
-```bash
-pip install pyyaml numpy
-python scripts/download_euroc.py --fast --case v1-01-easy
-```
+* Install `ffmpeg`
+* Install Python dependencies, eg by `pip install pyyaml numpy`
+* Run download and conversion, eg by: `python scripts/download_euroc.py --fast --case v1-01-easy`
 
 The converted datasets are saved under `data/benchmark/`. Note that about 10 GB of space is required for converting all the EuRoC datasets.
 
