@@ -13,6 +13,7 @@ pub fn run_visualize_3d(rx: mpsc::Receiver<()>) {
     arc_ball: ArcBall::new(eye, at),
     pose_trail: vec![],
     camera_lines: compute_camera_lines(scale),
+    head_position_trail: vec![],
   };
 
   let mut window = Window::new("3d visualization");
@@ -31,6 +32,7 @@ struct State {
   arc_ball: ArcBall,
   pose_trail: Vec<Matrix4d>,
   camera_lines: CameraLines,
+  head_position_trail: Vec<Vector3d>,
 }
 
 fn render(mut window: &mut Window, state: &mut State) {
@@ -57,6 +59,24 @@ fn render(mut window: &mut Window, state: &mut State) {
       mem::swap(&mut state.pose_trail, &mut d.pose_trail);
       d.pose_trail.clear();
     }
+  }
+
+  if let Some(head_pose) = state.pose_trail.get(0) {
+    let pos = position!(head_pose);
+    if state.head_position_trail.is_empty()
+      || (state.head_position_trail.iter().last().unwrap() - pos).norm_squared() > 1e-4
+    {
+      state.head_position_trail.push(pos.into());
+    }
+  }
+
+  let color = Point3::new(0., 1., 0.);
+  for w in state.head_position_trail.windows(2) {
+    window.draw_line(
+      &Point3f::from(w[0].cast::<f32>()),
+      &Point3f::from(w[1].cast::<f32>()),
+      &color
+    );
   }
 
   for T in &state.pose_trail {
