@@ -44,6 +44,11 @@ impl VisualUpdate {
     cameras: [&Camera; 2],
     pose_trail_frame_numbers: &VecDeque<usize>,
   ) {
+    {
+      let d = &mut DEBUG_DATA_3D.lock().unwrap();
+      d.triangulation_positions.clear();
+    }
+
     'track:
     for track in tracks {
       self.tmp.indices.clear();
@@ -97,11 +102,16 @@ impl VisualUpdate {
       let n = self.tmp.kalman_filter_poses.len();
       self.tmp.H.resize_mut(4 * n, kalman_filter.get_state_len(), 0.);
       self.tmp.y.resize_vertically_mut(4 * n, 0.);
+      let aw = self.tmp.triangulate_output.a;
+
+      {
+        let d = &mut DEBUG_DATA_3D.lock().unwrap();
+        d.triangulation_positions.push(aw);
+      }
 
       for i in 0..n {
         for j in 0..2 {
           let row = 2 * (2 * i + j);
-          let aw = self.tmp.triangulate_output.a;
           let pose = &self.tmp.kalman_filter_poses[i][j];
           // let wcp = position!(world_to_camera); // TODO This is not needed, right?
           // We decompose this for clarity with the derivatives but it's the same as:
@@ -148,11 +158,11 @@ impl VisualUpdate {
         } // for j in 0..2
       } // for i in 0..n
 
-    kalman_filter.update_visual(
-      &self.tmp.H,
-      &self.tmp.y,
-      self.kf_noise_visual,
-    );
+      kalman_filter.update_visual(
+        &self.tmp.H,
+        &self.tmp.y,
+        self.kf_noise_visual,
+      );
     } // process()
   }
 }

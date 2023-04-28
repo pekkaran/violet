@@ -358,7 +358,6 @@ impl KalmanFilter {
     // TODO Outlier check.
 
     update(&mut self.x, &mut self.P, H, y, &self.tmp_update.R, &mut self.tmp);
-    info!("update");
     self.normalize_quaternions();
   }
 

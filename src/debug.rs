@@ -28,4 +28,5 @@ pub struct DebugEpipolar {
 #[derive(Default)]
 pub struct DebugData3d {
   pub pose_trail: Vec<Matrix4d>,
+  pub triangulation_positions: Vec<Vector3d>,
 }

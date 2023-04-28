@@ -12,6 +12,7 @@ pub fn run_visualize_3d(rx: mpsc::Receiver<()>) {
   let mut state = State {
     arc_ball: ArcBall::new(eye, at),
     pose_trail: vec![],
+    triangulation_positions: vec![],
     camera_lines: compute_camera_lines(scale),
     head_position_trail: vec![],
   };
@@ -31,6 +32,7 @@ type CameraLines = [[Vector3d; 2]; 8];
 struct State {
   arc_ball: ArcBall,
   pose_trail: Vec<Matrix4d>,
+  triangulation_positions: Vec<Vector3d>,
   camera_lines: CameraLines,
   head_position_trail: Vec<Vector3d>,
 }
@@ -59,6 +61,10 @@ fn render(mut window: &mut Window, state: &mut State) {
       mem::swap(&mut state.pose_trail, &mut d.pose_trail);
       d.pose_trail.clear();
     }
+    if !d.triangulation_positions.is_empty() {
+      mem::swap(&mut state.triangulation_positions, &mut d.triangulation_positions);
+      d.triangulation_positions.clear();
+    }
   }
 
   if let Some(head_pose) = state.pose_trail.get(0) {
@@ -81,6 +87,10 @@ fn render(mut window: &mut Window, state: &mut State) {
 
   for T in &state.pose_trail {
     draw_camera(&mut window, T, &state.camera_lines);
+  }
+
+  for p in &state.triangulation_positions {
+    window.draw_point(&Point3f::from(p.cast::<f32>()), &color);
   }
 
   window.render_with_camera(&mut state.arc_ball);
