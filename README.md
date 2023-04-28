@@ -26,13 +26,11 @@ The implementation of the VIO is not yet complete, but some of the sub-component
 
 Goals:
 
-* Implement various algorithms from scratch to demonstrate and increase my understanding. See for example `src/optical_flow.rs` that implements the pyramidal Lucas-Kanade tracker in all its gnarly details.
-* Related to previous, do not depend on any computer vision libraries such as OpenCV.
+* Do not depend on any computer vision libraries such as OpenCV, implement all the relevant algorithms from scratch.
 * Demonstrate plausibility and advantages of using Rust over C++ for this kind of real-time sensor fusion applications. Consequently a goal is to make the implementation run relatively fast.
 
 Non-goals:
 
-* Monocular camera support. For technical reasons, a robust VIO is much easier to implement when a stereo camera setup can be assumed.
 * Simultaneous Localization and Mapping (SLAM).
 * State-of-the-art accuracy and robustness. For a commercial-grade solution, please see [Spectacular AI](https://www.spectacularai.com/).
 
