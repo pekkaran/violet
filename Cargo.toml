@@ -20,6 +20,8 @@ kiss3d = "0.34"
 nalgebra = "0.30"
 # Random number generation.
 rand = "0.8"
+# The core `rand` library does not provide any seedable RNGs?
+rand_xoshiro = "0.6"
 # Deserialization.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

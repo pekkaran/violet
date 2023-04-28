@@ -42,6 +42,7 @@ pub use {
   anyhow::{anyhow, bail, Context as AnyhowContext, Result},
   log::{debug, error, info, warn, LevelFilter},
   nalgebra::{dmatrix, dvector, matrix, DMatrix, DVector},
-  rand::{thread_rng, Rng},
+  rand::{thread_rng, Rng, rngs::ThreadRng},
+  rand_xoshiro::Xoshiro256PlusPlus,
   serde::Deserialize,
 };

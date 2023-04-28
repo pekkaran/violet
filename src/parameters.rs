@@ -7,6 +7,10 @@ lazy_static! {
 #[derive(Debug, Default)]
 #[derive(clap::Parser)]
 pub struct ParameterSet {
+  // Random seed.
+  #[clap(long, default_value = "0")]
+  pub seed: u64,
+
   #[clap(long, default_value = "1")]
   pub frame_sub: usize,
 

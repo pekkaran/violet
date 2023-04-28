@@ -1,7 +1,11 @@
 use crate::all::*;
 
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
+
 pub struct VisualUpdate {
   kf_noise_visual: f64,
+  rng: Xoshiro256PlusPlus,
   tmp: Tmp,
 }
 
@@ -22,6 +26,7 @@ impl VisualUpdate {
     let p = PARAMETER_SET.lock().unwrap();
     VisualUpdate {
       kf_noise_visual: p.kf_noise_visual,
+      rng: Xoshiro256PlusPlus::seed_from_u64(0),
       tmp: Tmp {
         kalman_filter_poses: vec![],
         indices: vec![],
@@ -49,8 +54,10 @@ impl VisualUpdate {
       d.triangulation_positions.clear();
     }
 
+    let mut successful_update_count = 0;
+
     'track:
-    for track in tracks {
+    for track in tracks.choose_multiple(&mut self.rng, 50) {
       self.tmp.indices.clear();
       self.tmp.normalized_coordinates.clear();
       let mut i = 0;
@@ -163,6 +170,9 @@ impl VisualUpdate {
         &self.tmp.y,
         self.kf_noise_visual,
       );
+
+      successful_update_count += 1;
+      if successful_update_count >= 5 { break }
     } // process()
   }
 }
