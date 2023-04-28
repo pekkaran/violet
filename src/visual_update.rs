@@ -197,7 +197,7 @@ fn triangulate(
     for j in 0..2 {
       let pose = &kalman_filter_poses[i][j];
       let ip = &normalized_coordinates[i][j];
-      let ip = Vector3d::new(ip[0], ip[1], 0.);
+      let ip = Vector3d::new(ip[0], ip[1], 1.);
       let vn = pose.R.transpose() * ip.normalize();
       let A = Matrix3d::identity() - vn * vn.transpose();
       S += A;
@@ -212,7 +212,7 @@ fn triangulate(
     for j in 0..2 {
       let pose = &kalman_filter_poses[i][j];
       let ip = &normalized_coordinates[i][j];
-      let ip = Vector3d::new(ip[0], ip[1], 0.);
+      let ip = Vector3d::new(ip[0], ip[1], 1.);
       let v = pose.R.transpose() * ip;
       let vn = v.normalize();
       let A = Matrix3d::identity() - vn * vn.transpose();
